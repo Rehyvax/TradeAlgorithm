@@ -54,21 +54,26 @@ Backtesting & Robustness Evaluation
     ↓
 Daily Paper Trading Execution
 
-Main Components
+
+```markdown
+# Main Components
 
 The repository is organized around the key stages of a systematic trading workflow:
 
-Script	Purpose
-trade_algorithm.py	Updates and stores market data
-feature_engineering.py	Computes financial features from price data
-signal_generation.py	Generates momentum signals and portfolio weights
-backtester.py	Evaluates historical performance of the strategy
-robust_evaluation.py	Tests robustness across parameter configurations
-daily_execution.py	Runs the automated daily paper trading workflow
-ml_strategy.py	Experimental machine learning extension
-test_alpaca_connection.py	Tests connectivity with Alpaca API
+| Script | Purpose |
+|------|------|
+| `trade_algorithm.py` | Updates and stores market data |
+| `feature_engineering.py` | Computes financial features from price data |
+| `signal_generation.py` | Generates momentum signals and portfolio weights |
+| `backtester.py` | Evaluates historical performance of the strategy |
+| `robust_evaluation.py` | Tests robustness across parameter configurations |
+| `daily_execution.py` | Runs the automated daily paper trading workflow |
+| `ml_strategy.py` | Experimental machine learning extension |
+| `test_alpaca_connection.py` | Tests connectivity with Alpaca API |
 
-
+---
+# Repository Structure
+```text
 TradeAlgorithm
 │
 ├── data/                      # stored market data and outputs
@@ -89,13 +94,14 @@ TradeAlgorithm
 ├── .gitignore
 └── README.md
 
+```markdown
 ## Installation
 
 Clone the repository:
 
+```bash
 git clone https://github.com/Rehyvax/TradeAlgorithm.git
 cd TradeAlgorithm
-
 Install the required dependencies: pip install -r requirements.txt
 
 # Outputs
