@@ -67,6 +67,8 @@ The repository is organized around the key stages of a systematic trading workfl
 | `backtester.py` | Evaluates historical performance of the strategy |
 | `robust_evaluation.py` | Tests robustness across parameter configurations |
 | `daily_execution.py` | Runs the automated daily paper trading workflow |
+| `paper_trading_simulation.py` | Simulates paper-trading execution using Alpaca |
+| `live_dashboard.py` | Visual dashboard for monitoring strategy equity |
 | `ml_strategy.py` | Experimental machine learning extension |
 | `test_alpaca_connection.py` | Tests connectivity with Alpaca API |
 
