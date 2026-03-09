@@ -1,0 +1,23 @@
+
+Ticker,Asset Class,Asset Subset,Risk Factors,Assets_B,Shares_M,Volume
+IWD,Equity,Large U.S. Value Stocks,Value,70.14,331.3,5233673
+IWF,Equity,Large U.S. Growth Stocks,Growth,124.79,264.55,1835152
+IWN,Equity,Small U.S. Value Stocks,"Capitalization, Value",12.5,66.75,588258
+IWO,Equity,Small U.S. Growth Stocks,"Capitalization, Growth",13.45,40.9,347664
+EFA,Equity,Large Non-U.S. Developed Market Stocks,Domicile,69.85,725.4,34905530
+SCZ,Equity,Small Non-U.S. Developed Market Stocks,"Domicile, Capitalization",12.55,160.8,725263
+EEM,Equity,Non-U.S. Emerging Market Stocks,Domicile,20.66,380.25,35734591
+TIP,Fixed Income,U.S. Inflation-Protected Bonds,Inflation,14.05,127.3,1830987
+SHY,Fixed Income,U.S. Short Duration Bonds,Short Duration,23.55,284.1,5873596
+TLT,Fixed Income,U.S. Long Duration Bonds,Long Duration,47.63,545.1,24663881
+LQD,Fixed Income,U.S. Investment Grade Credit,IG Credit Spreads,31.39,298.1,22245739
+HYG,Fixed Income,U.S. High Yield Credit,HY Credit Spreads,20.43,253.1,36998189
+BWX,Fixed Income,Non-U.S. Developed Market Bonds,Developed Market Currencies,1.35,59.7,3504118
+EMB,Fixed Income,Non-U.S. Emerging Market Bonds,Emerging Market Currencies,16.66,173.1,7062170
+BIZD,Alternative,Private Equity,Private Capital,1.6,106.55,2176173
+BKLN,Alternative,Private Credit,Private Capital,6.69,318.5,7676240
+RWR,Alternative,Real Estate,Real Estate,1.72,17.16,388376
+USO,Alternative,Energy Commodities,Commodity,1.01,13.22,7384688
+DBA,Alternative,Agricultural Commodities,Commodity,0.75123,29.55,58682
+DBB,Alternative,Industrial Metal Commodities,Commodity,0.17743,6.15,99421
+GLD,Alternative,Precious Metal Commodities,Commodity,145.91,363.7,10456889
