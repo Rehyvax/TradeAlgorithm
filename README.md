@@ -54,8 +54,7 @@ Backtesting & Robustness Evaluation
     ↓
 Daily Paper Trading Execution
 
-
-```markdown
+```
 # Main Components
 
 The repository is organized around the key stages of a systematic trading workflow:
@@ -94,12 +93,12 @@ TradeAlgorithm
 ├── .gitignore
 └── README.md
 
-```markdown
+```
 ## Installation
 
 Clone the repository:
 
-```bash
+```
 git clone https://github.com/Rehyvax/TradeAlgorithm.git
 cd TradeAlgorithm
 Install the required dependencies: pip install -r requirements.txt
