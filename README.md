@@ -103,6 +103,7 @@ git clone https://github.com/Rehyvax/TradeAlgorithm.git
 cd TradeAlgorithm
 Install the required dependencies: pip install -r requirements.txt
 
+```
 # Outputs
 
 Depending on the executed scripts, the system may generate:
