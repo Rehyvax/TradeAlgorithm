@@ -253,10 +253,10 @@ Sections: **Equity Curve** (normalised equity + total return / peak / drawdown m
 
 | Priority | Extension |
 |---|---|
-| ✅ Implemented | Walk-forward validation with parameter selection on train data only |
-| ✅ Implemented | Square-root market-impact transaction cost model |
-| ✅ Implemented | ML extension (logistic regression, per-asset feature rows, CS signal ranking) |
-| ✅ Implemented | **Universe segmentation** — momentum applied independently within equity, fixed income, and alternatives groups; OOS Sharpe improved from −0.11 to +0.31 (see Research Findings) |
+| [done] | Walk-forward validation with parameter selection on train data only |
+| [done] | Square-root market-impact transaction cost model |
+| [done] | ML extension (logistic regression, per-asset feature rows, CS signal ranking) |
+| [done] | **Universe segmentation** — momentum applied independently within equity, fixed income, and alternatives groups; OOS Sharpe improved from −0.11 to +0.31 (see Research Findings) |
 | Next | **Integrate segmented strategy into `daily_execution.py`** as the default signal source, replacing `signal_generation.py` |
 | Next | Volatility regime conditioning — weight signals by a VIX or realised-vol regime indicator to reduce exposure during momentum crash environments (Daniel & Moskowitz, 2016) |
 | Next | Expanding universe — include individual stocks or sector ETFs to increase the number of cross-sectional observations and improve the law-of-large-numbers properties of the factor |
