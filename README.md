@@ -240,6 +240,14 @@ Sections: **Equity Curve** (normalised equity + total return / peak / drawdown m
 
 ---
 
+## Dashboard
+
+The monitoring dashboard is available at http://localhost:5050 after running `dashboard_server.py`.
+
+![Robustness table](screenshots/robustness.png)
+
+---
+
 ## Limitations
 
 - **Paper trading only.** The system connects exclusively to Alpaca's paper trading environment. Slippage, partial fills, and borrow costs for short positions are not modelled.
