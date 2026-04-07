@@ -71,6 +71,7 @@ from alpaca.trading.enums import OrderSide, TimeInForce
 
 import trade_algorithm
 import signal_generation
+from universe_segments import run_segmented_strategy
 
 
 def project_dirs(base_dir: Path) -> Dict[str, Path]:
@@ -138,24 +139,34 @@ def log_jsonl(log_path: Path, event: dict) -> None:
         f.write(json.dumps(event, ensure_ascii=False) + "\n")
 
 
-def load_latest_target_weights(signals_dir: Path) -> pd.Series:
+def load_latest_target_weights(signals_dir: Path, use_segmented: bool = True) -> pd.Series:
     """Load the most recent weight vector from the signals directory.
 
-    Assumes files are named ``weights_cs_YYYY-MM-DD.csv`` and contains
-    weights for each ticker in columns.  Selects the last row (most
-    recent date) from the latest file.
+    If ``use_segmented=True`` (default), looks for the latest
+    ``weights_segmented_*.csv`` produced by ``universe_segments.py``.
+    Falls back to ``weights_cs_*.csv`` if no segmented file exists.
 
     Parameters
     ----------
     signals_dir : Path
         Directory containing weight CSV files.
+    use_segmented : bool, optional
+        If True, prefer segmented strategy weights over CS weights.
 
     Returns
     -------
     pandas.Series
         Series of target weights indexed by ticker as strings.
     """
-    w_path = latest_csv(signals_dir, "weights_cs_*.csv")
+    if use_segmented:
+        seg_files = sorted(signals_dir.glob("weights_segmented_*.csv"))
+        if seg_files:
+            w_path = seg_files[-1]
+        else:
+            print("[WARNING] No weights_segmented_*.csv found — falling back to weights_cs_*.csv")
+            w_path = latest_csv(signals_dir, "weights_cs_*.csv")
+    else:
+        w_path = latest_csv(signals_dir, "weights_cs_*.csv")
     w = pd.read_csv(w_path, index_col=0, parse_dates=True)
     # Take the last row (most recent date) as today's target
     target = w.iloc[-1].copy()
@@ -457,6 +468,7 @@ def main(
     target_vol: float = 0.1,
     rebalance_band: float = 0.01,
     min_trade_usd: float = 25.0,
+    use_segmented: bool = True,
 ) -> None:
     """Entry point for the daily execution pipeline.
 
@@ -488,6 +500,10 @@ def main(
     min_trade_usd : float, optional
         Minimum notional amount per trade.  Orders smaller than this
         threshold are skipped.
+    use_segmented : bool, optional
+        If True (default), use weights from the segmented momentum
+        strategy (``weights_segmented_*.csv``) instead of the plain
+        cross-sectional strategy (``weights_cs_*.csv``).
     """
     base_dir = Path(__file__).resolve().parent
     dirs = project_dirs(base_dir)
@@ -505,8 +521,22 @@ def main(
     # Step B: Generate signals and weights
     signal_generation.main()
 
+    # Step B2: Generate segmented weights and save to data/signals/
+    import glob as _glob
+    price_files = sorted(_glob.glob(str(dirs["prices"] / "adjclose_wide_*.csv")))
+    if price_files:
+        prices_df = pd.read_csv(price_files[-1], index_col=0, parse_dates=True).dropna(axis=1, how="all")
+        seg_result = run_segmented_strategy(prices_df)
+        seg_weights: pd.DataFrame = seg_result["weights"]
+        today_str = datetime.now(timezone.utc).date().isoformat()
+        seg_path = dirs["signals"] / f"weights_segmented_{today_str}.csv"
+        seg_weights.to_csv(seg_path)
+        print(f"[B2] Segmented weights saved to {seg_path}")
+    else:
+        print("[B2] WARNING: No price files found — skipping segmented weight generation")
+
     # Step C: Load latest weights
-    target_w = load_latest_target_weights(dirs["signals"])
+    target_w = load_latest_target_weights(dirs["signals"], use_segmented=use_segmented)
     target_w = enforce_weight_constraints(
     target_w,
     max_positions=10,

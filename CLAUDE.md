@@ -42,6 +42,8 @@ feature_engineering.py  → (imported as a library, not run directly)
     ↓
 signal_generation.py    → data/signals/weights_cs_YYYY-MM-DD.csv
     ↓
+universe_segments.py    → data/signals/weights_segmented_YYYY-MM-DD.csv  (default signal source)
+    ↓
 daily_execution.py      → Alpaca paper API → data/live/equity_history.csv
                                            → data/live/logs/daily_execution.jsonl
 ```
@@ -51,7 +53,8 @@ daily_execution.py      → Alpaca paper API → data/live/equity_history.csv
 - **`loaders/price_loader.py`** — `PriceDownloadConfig` dataclass and shared utilities (`download_prices_adjclose`, `quality_checks_prices`, `save_prices_panel`) used by both `trade_algorithm.py` and `signal_generation.py`.
 - **`feature_engineering.py`** — Called as a library. Returns a nested dict of DataFrames keyed by feature name (log returns at multiple horizons, rolling volatility, drawdown, cross-sectional ranks). These are wide DataFrames: dates × tickers.
 - **`signal_generation.py`** — Ranks assets cross-sectionally, longs top 20%, shorts bottom 20%, applies inverse-volatility scaling, outputs normalized weights (sum of abs = 1).
-- **`daily_execution.py`** — The production entry point. Calls the pipeline end-to-end, enforces risk controls, converts weights to dollar notionals, and submits market orders via `alpaca.trading.client.TradingClient`. Key parameters in `main()`: `dry_run`, `gross_exposure`, `long_only`, `max_drawdown`, `target_vol`, `rebalance_band`, `min_trade_usd`.
+- **`universe_segments.py`** — Applies cross-sectional momentum independently within three homogeneous groups (equity, fixed income, alternatives) and combines with equal group-level weights. OOS Sharpe improved from −0.11 to +0.31 vs. the mixed-universe strategy.
+- **`daily_execution.py`** — The production entry point. After running `signal_generation.py` (Step B), it runs `run_segmented_strategy()` and saves the result to `data/signals/weights_segmented_YYYY-MM-DD.csv` (Step B2). By default (`use_segmented=True`) it loads these segmented weights; falls back to `weights_cs_*.csv` if the file is missing. Key parameters in `main()`: `dry_run`, `gross_exposure`, `long_only`, `max_drawdown`, `target_vol`, `rebalance_band`, `min_trade_usd`, `use_segmented`.
 
 ### Risk controls (in daily_execution.py)
 
@@ -63,7 +66,7 @@ daily_execution.py      → Alpaca paper API → data/live/equity_history.csv
 ### Data conventions
 
 - Prices are stored in two formats: long (`prices_long_YYYY-MM-DD.csv`) and wide (`adjclose_wide_YYYY-MM-DD.csv`).
-- Signals and weights are date-stamped: `signals_cs_YYYY-MM-DD.csv`, `weights_cs_YYYY-MM-DD.csv`.
+- Signals and weights are date-stamped: `signals_cs_YYYY-MM-DD.csv`, `weights_cs_YYYY-MM-DD.csv`, `weights_segmented_YYYY-MM-DD.csv`.
 - Weights are lagged by one day when used in backtests (avoids look-ahead bias).
 - The trading universe is 24 ETFs defined in `data/universe.csv`; assets are filtered by minimum $500k daily volume and $200M AUM at ingestion time.
 - Audit trail for live runs is in `data/live/logs/daily_execution.jsonl` (JSONL format).
