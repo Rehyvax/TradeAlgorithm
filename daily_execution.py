@@ -321,9 +321,14 @@ def generate_order_plan(
         if abs(delta) / max(equity, 1.0) < rebalance_band:
             continue
         side = OrderSide.BUY if delta > 0 else OrderSide.SELL
+        notional = abs(delta)
+        if side == OrderSide.SELL:
+            # 0.5% safety margin to avoid "insufficient qty" errors caused by
+            # rounding differences between our position estimate and Alpaca's.
+            notional *= 0.995
         orders.append({
             "symbol": sym,
-            "notional": abs(delta),
+            "notional": notional,
             "side": side,
         })
     return orders
@@ -403,16 +408,28 @@ def submit_orders(
                 "status": "DRY_RUN",
             })
         else:
-            # Submit the order via Alpaca's API. Rounding ensures the notional value
-            # conforms to Alpaca's two decimal place requirement.
-            order = trading.submit_order(order_data=req)
-            results.append({
-                "symbol": sym,
-                "notional": notional,
-                "side": str(side),
-                "id": str(order.id),
-                "status": "SUBMITTED",
-            })
+            try:
+                # Submit the order via Alpaca's API. Rounding ensures the notional value
+                # conforms to Alpaca's two decimal place requirement.
+                order = trading.submit_order(order_data=req)
+                results.append({
+                    "symbol": sym,
+                    "notional": notional,
+                    "side": str(side),
+                    "id": str(order.id),
+                    "status": "SUBMITTED",
+                })
+            except Exception as exc:
+                if "insufficient qty" in str(exc).lower():
+                    print(f"[WARNING] {sym}: insufficient qty — skipping. ({exc})")
+                    results.append({
+                        "symbol": sym,
+                        "notional": notional,
+                        "side": str(side),
+                        "status": "SKIPPED_INSUFFICIENT_QTY",
+                    })
+                else:
+                    raise
     return results
 
 
