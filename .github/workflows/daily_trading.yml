@@ -1,0 +1,44 @@
+name: Daily Trading Execution
+
+on:
+  schedule:
+    - cron: "30 21 * * 1-5"   # 21:30 UTC = 16:30 EST (invierno) / 23:30 Madrid verano
+  workflow_dispatch:
+
+jobs:
+  run-daily-strategy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run daily execution
+        env:
+          ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_API_SECRET: ${{ secrets.ALPACA_API_SECRET }}
+        run: python daily_execution.py
+
+      - name: Commit and push generated data
+        run: |
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions"
+          git add data/
+          git commit -m "auto: daily execution $(date +%Y-%m-%d)" || echo "No changes to commit"
+          git push
