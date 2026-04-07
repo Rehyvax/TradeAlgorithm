@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TradeAlgorithm Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <style>
+    /* ── Reset & variables ─────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:           #0d1117;
+      --surface:      #161b22;
+      --surface-2:    #1f2937;
+      --border:       #30363d;
+      --text:         #e6edf3;
+      --text-muted:   #7d8590;
+      --accent:       #58a6ff;
+      --accent-dim:   #1f3a5f;
+      --green:        #3fb950;
+      --green-dim:    #0d2f1a;
+      --red:          #f85149;
+      --red-dim:      #3b1414;
+      --sidebar-w:    220px;
+      --header-h:     56px;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    /* ── Sidebar ───────────────────────────────────────────────────────── */
+    .sidebar {
+      position: fixed;
+      top: 0; left: 0;
+      width: var(--sidebar-w);
+      height: 100vh;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      z-index: 100;
+    }
+
+    .sidebar-logo {
+      padding: 20px 20px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .sidebar-logo .name {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: 0.3px;
+    }
+
+    .sidebar-logo .sub {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .nav {
+      padding: 12px 0;
+      flex: 1;
+    }
+
+    .nav-link {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 20px;
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 13.5px;
+      border-left: 3px solid transparent;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+      cursor: pointer;
+    }
+
+    .nav-link:hover {
+      background: var(--surface-2);
+      color: var(--text);
+    }
+
+    .nav-link.active {
+      color: var(--accent);
+      border-left-color: var(--accent);
+      background: var(--accent-dim);
+    }
+
+    .nav-link .icon {
+      font-size: 15px;
+      width: 18px;
+      text-align: center;
+    }
+
+    .sidebar-footer {
+      padding: 14px 20px;
+      border-top: 1px solid var(--border);
+    }
+
+    .refresh-status {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .refresh-status .dot {
+      display: inline-block;
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--green);
+      margin-right: 6px;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.3; }
+    }
+
+    /* ── Main layout ───────────────────────────────────────────────────── */
+    .main {
+      margin-left: var(--sidebar-w);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .topbar {
+      height: var(--header-h);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 28px;
+      gap: 10px;
+      background: var(--surface);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+
+    .topbar-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .topbar-sub {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-left: auto;
+    }
+
+    .content {
+      padding: 28px;
+      flex: 1;
+    }
+
+    /* ── Sections ──────────────────────────────────────────────────────── */
+    .section { display: none; }
+    .section.active { display: block; }
+
+    .section-header {
+      margin-bottom: 20px;
+    }
+
+    .section-header h2 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .section-header p {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* ── Cards ─────────────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px 24px;
+    }
+
+    .card + .card { margin-top: 16px; }
+
+    .card-label {
+      font-size: 11.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+
+    /* ── Chart containers ──────────────────────────────────────────────── */
+    .chart-wrap {
+      position: relative;
+    }
+
+    .chart-wrap.equity-wrap { height: 340px; }
+    .chart-wrap.weights-wrap { height: 360px; }
+
+    /* ── Error / empty states ──────────────────────────────────────────── */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 48px 0;
+      color: var(--text-muted);
+      gap: 8px;
+    }
+
+    .empty-state .icon { font-size: 28px; }
+    .empty-state p { font-size: 13px; }
+
+    /* ── Robustness table ──────────────────────────────────────────────── */
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    thead th {
+      text-align: left;
+      padding: 8px 12px;
+      font-size: 11.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background 0.1s;
+    }
+
+    tbody tr:last-child { border-bottom: none; }
+
+    tbody tr:hover { background: var(--surface-2); }
+
+    tbody td {
+      padding: 9px 12px;
+      color: var(--text);
+    }
+
+    td.sharpe-cell {
+      font-weight: 600;
+      border-radius: 4px;
+    }
+
+    /* ── Log cards ─────────────────────────────────────────────────────── */
+    .log-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .log-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 18px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px 16px;
+    }
+
+    .log-card:hover { border-color: var(--accent); }
+
+    .log-ts {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-family: monospace;
+    }
+
+    .log-badge {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 12px;
+      align-self: start;
+      justify-self: end;
+    }
+
+    .log-badge.dry { background: var(--accent-dim); color: var(--accent); }
+    .log-badge.live { background: var(--green-dim); color: var(--green); }
+
+    .log-body {
+      display: flex;
+      gap: 24px;
+      align-items: center;
+      grid-column: 1 / -1;
+    }
+
+    .log-stat { display: flex; flex-direction: column; gap: 2px; }
+
+    .log-stat .label {
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+    }
+
+    .log-stat .value {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .log-orders {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+      grid-column: 1 / -1;
+    }
+
+    .order-tag {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-weight: 600;
+    }
+
+    .order-tag.buy  { background: var(--green-dim); color: var(--green); }
+    .order-tag.sell { background: var(--red-dim);   color: var(--red); }
+
+    /* ── Equity metric cards ───────────────────────────────────────────── */
+    .metrics-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .metric-card {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 18px;
+    }
+
+    .metric-label {
+      font-size: 10.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .metric-value {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .metric-value.positive { color: var(--green); }
+    .metric-value.negative { color: var(--red); }
+
+    /* ── About section ─────────────────────────────────────────────────── */
+    .about-block { display: flex; flex-direction: column; gap: 16px; }
+
+    .about-text p { font-size: 13.5px; color: var(--text); line-height: 1.7; margin-bottom: 10px; }
+    .about-text ol { padding-left: 20px; }
+    .about-text li { font-size: 13.5px; color: var(--text); line-height: 1.7; margin-bottom: 5px; }
+    .about-text strong { color: var(--accent); }
+
+    .about-sections { display: flex; flex-direction: column; gap: 14px; }
+
+    .about-section-item {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+    }
+
+    .about-icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+
+    .about-section-item strong { display: block; font-size: 13.5px; margin-bottom: 3px; color: var(--text); }
+
+    .about-section-item p { font-size: 13px; color: var(--text-muted); line-height: 1.6; }
+
+    .glossary { display: flex; flex-direction: column; gap: 16px; }
+
+    .glossary dt {
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 4px;
+    }
+
+    .glossary dd {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.65;
+      margin-left: 0;
+    }
+
+    .glossary dd em { color: var(--text); font-style: normal; font-weight: 500; }
+
+    /* ── Scrollbar ─────────────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<!-- ── Sidebar ─────────────────────────────────────────────────────────── -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="name">TradeAlgorithm</div>
+    <div class="sub">Paper Trading Dashboard</div>
+  </div>
+
+  <nav class="nav">
+    <a class="nav-link active" data-section="equity">
+      <span class="icon">📈</span> Equity Curve
+    </a>
+    <a class="nav-link" data-section="positions">
+      <span class="icon">⚖️</span> Positions
+    </a>
+    <a class="nav-link" data-section="robustness">
+      <span class="icon">🔬</span> Robustness
+    </a>
+    <a class="nav-link" data-section="logs">
+      <span class="icon">🗒️</span> Logs
+    </a>
+    <a class="nav-link" data-section="about">
+      <span class="icon">ℹ️</span> About
+    </a>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="refresh-status">
+      <span class="dot"></span>
+      Auto-refresh 60s
+    </div>
+    <div id="lastRefresh" class="refresh-status" style="margin-top:4px;"></div>
+  </div>
+</aside>
+
+<!-- ── Main ────────────────────────────────────────────────────────────── -->
+<div class="main">
+  <header class="topbar">
+    <span class="topbar-title" id="topbarTitle">Equity Curve</span>
+    <span class="topbar-sub" id="topbarSub"></span>
+  </header>
+
+  <div class="content">
+
+    <!-- Equity Curve -->
+    <section id="equity" class="section active">
+      <div class="section-header">
+        <h2>Equity Curve</h2>
+        <p>Normalised portfolio equity over time (base = first recorded value)</p>
+      </div>
+      <div class="card">
+        <div class="card-label">Normalised Equity</div>
+        <div class="chart-wrap equity-wrap">
+          <canvas id="equityChart"></canvas>
+        </div>
+        <div class="metrics-row">
+          <div class="metric-card">
+            <div class="metric-label">Total Return</div>
+            <div class="metric-value" id="metricTotalReturn">—</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Peak Equity</div>
+            <div class="metric-value" id="metricPeakEquity">—</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Current Drawdown</div>
+            <div class="metric-value" id="metricDrawdown">—</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Positions -->
+    <section id="positions" class="section">
+      <div class="section-header">
+        <h2>Current Positions</h2>
+        <p id="weightsDate">Latest signal weights — volatility-scaled &amp; normalised</p>
+      </div>
+      <div class="card">
+        <div class="card-label">Portfolio Weights</div>
+        <div class="chart-wrap weights-wrap">
+          <canvas id="weightsChart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- Robustness -->
+    <section id="robustness" class="section">
+      <div class="section-header">
+        <h2>Robustness Analysis</h2>
+        <p>Top 10 parameter configurations by Sharpe ratio</p>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Lookback</th>
+                <th>Long %</th>
+                <th>Short %</th>
+                <th>Vol win.</th>
+                <th>Cum. Return</th>
+                <th>Ann. Return</th>
+                <th>Ann. Vol</th>
+                <th>Sharpe</th>
+                <th>Max DD</th>
+              </tr>
+            </thead>
+            <tbody id="robustnessBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Logs -->
+    <section id="logs" class="section">
+      <div class="section-header">
+        <h2>Execution Logs</h2>
+        <p>Last 30 daily execution events, most recent first</p>
+      </div>
+      <div id="logsList" class="log-list"></div>
+    </section>
+
+    <!-- About -->
+    <section id="about" class="section">
+      <div class="section-header">
+        <h2>Acerca de la estrategia</h2>
+        <p>Cómo funciona TradeAlgorithm y cómo interpretar este dashboard</p>
+      </div>
+
+      <div class="about-block">
+
+        <div class="card">
+          <div class="card-label">¿Qué es el momentum cross-seccional?</div>
+          <div class="about-text">
+            <p>El <strong>momentum cross-seccional</strong> es una estrategia que clasifica un conjunto de activos entre sí en función de su rentabilidad pasada. La idea central es que los activos que han tenido un mejor comportamiento relativo en los últimos meses tienden a seguir superando a sus pares durante el periodo siguiente, y viceversa.</p>
+            <p>En este proyecto el universo es un grupo de 24 ETFs que cubren renta variable global, renta fija, materias primas y activos alternativos. Cada día la estrategia sigue estos pasos:</p>
+            <ol>
+              <li>Calcula el retorno logarítmico de los últimos 252 días (≈ 1 año) para cada ETF.</li>
+              <li>Clasifica los ETFs por ese retorno de forma cruzada: quién lo ha hecho mejor, quién peor.</li>
+              <li>Toma posición <strong>larga</strong> (compra) en el 20% superior y posición <strong>corta</strong> (venta) en el 20% inferior.</li>
+              <li>Escala cada posición por la inversa de su volatilidad para que los activos más volátiles no dominen el riesgo de la cartera.</li>
+              <li>Normaliza los pesos resultantes para que la suma de valores absolutos sea 1.</li>
+            </ol>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-label">Secciones del dashboard</div>
+          <div class="about-sections">
+            <div class="about-section-item">
+              <span class="about-icon">📈</span>
+              <div>
+                <strong>Equity Curve</strong>
+                <p>Muestra la evolución del capital normalizado respecto al primer registro (base = 1,0). Un valor de 1,05 significa un crecimiento del 5% desde el inicio. Las tres métricas bajo el gráfico resumen la rentabilidad total, el capital máximo alcanzado y el drawdown actual respecto a ese máximo.</p>
+              </div>
+            </div>
+            <div class="about-section-item">
+              <span class="about-icon">⚖️</span>
+              <div>
+                <strong>Positions</strong>
+                <p>Muestra los pesos de la cartera en la última fecha de señal disponible. Las barras verdes son posiciones largas (el algoritmo espera que ese activo suba) y las rojas son cortas (espera que baje). El tamaño de cada barra refleja el peso ajustado por volatilidad.</p>
+              </div>
+            </div>
+            <div class="about-section-item">
+              <span class="about-icon">🔬</span>
+              <div>
+                <strong>Robustness</strong>
+                <p>Tabla del análisis de robustez: el algoritmo prueba múltiples combinaciones de parámetros (horizonte de lookback, percentiles long/short, ventana de volatilidad) y ordena los resultados por Sharpe ratio. Las celdas con fondo más verde corresponden a configuraciones con mejor relación rentabilidad/riesgo.</p>
+              </div>
+            </div>
+            <div class="about-section-item">
+              <span class="about-icon">🗒️</span>
+              <div>
+                <strong>Logs</strong>
+                <p>Registro de cada ejecución diaria. Muestra cuándo se ejecutó, el capital en ese momento, cuántas órdenes se generaron y si estaba en modo <em>DRY RUN</em> (simulación sin órdenes reales) o <em>LIVE</em> (órdenes reales a través de Alpaca Paper Trading).</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-label">Glosario</div>
+          <dl class="glossary">
+            <dt>Sharpe Ratio</dt>
+            <dd>Mide la rentabilidad ajustada por riesgo. Se calcula como la rentabilidad anualizada dividida entre la volatilidad anualizada. Un Sharpe superior a <em>1,0</em> indica que la estrategia genera más retorno por unidad de riesgo que una inversión sin riesgo. Cuanto mayor, mejor.</dd>
+
+            <dt>Drawdown</dt>
+            <dd>Caída desde el máximo histórico. Si la cartera alcanzó $110.000 y ahora vale $100.000, el drawdown es del <em>−9,1%</em>. El <em>max drawdown</em> es la mayor caída registrada y refleja el peor escenario que habría vivido el inversor hasta ese momento.</dd>
+
+            <dt>Volatility Scaling</dt>
+            <dd>Técnica que ajusta el tamaño de cada posición en función de la volatilidad reciente del activo. Los activos más volátiles reciben un peso menor para que cada uno contribuya de forma similar al riesgo total de la cartera. El resultado es una cartera más estable, con menos drawdowns y mejor Sharpe ratio.</dd>
+
+            <dt>Long / Short</dt>
+            <dd>Una posición <em>larga</em> (long) significa comprar un activo esperando que suba de precio. Una posición <em>corta</em> (short) significa venderlo sin tenerlo (a través de préstamo de valores) esperando recomprarlo más barato. Una cartera long/short puede generar rentabilidad independientemente de la dirección general del mercado.</dd>
+          </dl>
+        </div>
+
+      </div>
+    </section>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<script>
+  // ── Navigation ─────────────────────────────────────────────────────────
+  const SECTION_TITLES = {
+    equity:     "Equity Curve",
+    positions:  "Positions",
+    robustness: "Robustness",
+    logs:       "Execution Logs",
+    about:      "Acerca de la estrategia",
+  };
+
+  document.querySelectorAll(".nav-link").forEach(link => {
+    link.addEventListener("click", e => {
+      e.preventDefault();
+      const id = link.dataset.section;
+
+      document.querySelectorAll(".nav-link").forEach(l => l.classList.remove("active"));
+      document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
+
+      link.classList.add("active");
+      document.getElementById(id).classList.add("active");
+      document.getElementById("topbarTitle").textContent = SECTION_TITLES[id];
+    });
+  });
+
+  // ── Chart instances ────────────────────────────────────────────────────
+  let equityChart  = null;
+  let weightsChart = null;
+
+  const CHART_DEFAULTS = {
+    color: "#e6edf3",
+    borderColor: "#30363d",
+  };
+
+  Chart.defaults.color = CHART_DEFAULTS.color;
+
+  // ── Helpers ────────────────────────────────────────────────────────────
+  function fmt(n, decimals = 4) {
+    return n == null ? "—" : Number(n).toFixed(decimals);
+  }
+
+  function fmtPct(n) {
+    return n == null ? "—" : (Number(n) * 100).toFixed(2) + "%";
+  }
+
+  function fmtUSD(n) {
+    return n == null ? "—" : "$" + Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function fmtTS(iso) {
+    try {
+      return new Date(iso).toLocaleString("en-GB", {
+        year: "numeric", month: "short", day: "2-digit",
+        hour: "2-digit", minute: "2-digit", timeZoneName: "short",
+      });
+    } catch { return iso; }
+  }
+
+  // Interpolate colour between red and green based on t ∈ [0, 1]
+  function heatColor(t, alpha = 1) {
+    const r = Math.round(248 * (1 - t) + 63  * t);
+    const g = Math.round(81  * (1 - t) + 185 * t);
+    const b = Math.round(73  * (1 - t) + 80  * t);
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+
+  function emptyState(message) {
+    return `<div class="empty-state">
+      <span class="icon">📭</span>
+      <p>${message}</p>
+    </div>`;
+  }
+
+  // ── Equity chart ───────────────────────────────────────────────────────
+  async function loadEquity() {
+    const res  = await fetch("/api/equity");
+    const data = await res.json();
+
+    if (data.error) {
+      document.querySelector("#equity .card").innerHTML =
+        '<div class="card-label">Normalised Equity</div>' + emptyState(data.error);
+      return;
+    }
+
+    const labels = data.map(d => {
+      const dt = new Date(d.timestamp);
+      return dt.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" });
+    });
+    const values = data.map(d => d.equity_norm);
+
+    const ctx = document.getElementById("equityChart").getContext("2d");
+
+    const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+    gradient.addColorStop(0, "rgba(88,166,255,0.25)");
+    gradient.addColorStop(1, "rgba(88,166,255,0.0)");
+
+    if (equityChart) equityChart.destroy();
+
+    equityChart = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [{
+          label: "Equity (norm.)",
+          data: values,
+          borderColor: "#58a6ff",
+          backgroundColor: gradient,
+          borderWidth: 2,
+          pointRadius: data.length > 60 ? 0 : 3,
+          pointHoverRadius: 5,
+          fill: true,
+          tension: 0.3,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: "index", intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: "#1f2937",
+            borderColor: "#30363d",
+            borderWidth: 1,
+            callbacks: {
+              label: ctx => " " + Number(ctx.parsed.y).toFixed(4),
+            },
+          },
+        },
+        scales: {
+          x: {
+            grid: { color: "#30363d40" },
+            ticks: {
+              color: "#7d8590",
+              maxTicksLimit: 10,
+              maxRotation: 0,
+            },
+          },
+          y: {
+            grid: { color: "#30363d40" },
+            ticks: { color: "#7d8590" },
+          },
+        },
+      },
+    });
+
+    // ── Metric cards ──────────────────────────────────────────────────────
+    const equities   = data.map(d => d.equity);
+    const last       = data[data.length - 1];
+    const peak       = Math.max(...equities);
+    const totalRet   = last.equity_norm - 1;
+    const currentDD  = last.equity / peak - 1;
+
+    const trEl = document.getElementById("metricTotalReturn");
+    trEl.textContent = (totalRet >= 0 ? "+" : "") + (totalRet * 100).toFixed(2) + "%";
+    trEl.className = "metric-value " + (totalRet >= 0 ? "positive" : "negative");
+
+    document.getElementById("metricPeakEquity").textContent = fmtUSD(peak);
+
+    const ddEl = document.getElementById("metricDrawdown");
+    ddEl.textContent = (currentDD >= 0 ? "+" : "") + (currentDD * 100).toFixed(2) + "%";
+    ddEl.className = "metric-value " + (currentDD >= 0 ? "positive" : "negative");
+
+    // ── Topbar: date · equity · daily PnL ─────────────────────────────────
+    const lastDate = new Date(last.timestamp).toLocaleDateString("en-GB", {
+      day: "2-digit", month: "short", year: "numeric",
+    });
+    const prev   = data.length > 1 ? data[data.length - 2] : null;
+    const pnl    = prev != null ? last.equity - prev.equity : null;
+    const pnlAbs = pnl != null ? Math.abs(pnl).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : null;
+    const pnlStr = pnl == null  ? "PnL: —"
+                 : pnl >= 0     ? `<span style="color:var(--green)">+$${pnlAbs}</span>`
+                 :                `<span style="color:var(--red)">−$${pnlAbs}</span>`;
+
+    document.getElementById("topbarSub").innerHTML =
+      `${lastDate} &nbsp;·&nbsp; ${fmtUSD(last.equity)} &nbsp;·&nbsp; ${pnlStr}`;
+  }
+
+  // ── Weights chart ──────────────────────────────────────────────────────
+  async function loadWeights() {
+    const res  = await fetch("/api/weights");
+    const data = await res.json();
+
+    if (data.error) {
+      document.querySelector("#positions .card").innerHTML =
+        '<div class="card-label">Portfolio Weights</div>' +
+        emptyState("No positions data available yet. Run signal_generation.py first.");
+      return;
+    }
+
+    document.getElementById("weightsDate").textContent =
+      `Signal date: ${data.date} — volatility-scaled & normalised`;
+
+    const items  = data.weights;
+    const labels = items.map(d => d.ticker);
+    const values = items.map(d => d.weight);
+    const colors = items.map(d =>
+      d.weight >= 0 ? "rgba(63,185,80,0.75)" : "rgba(248,81,73,0.75)"
+    );
+    const borderColors = items.map(d =>
+      d.weight >= 0 ? "#3fb950" : "#f85149"
+    );
+
+    const ctx = document.getElementById("weightsChart").getContext("2d");
+    if (weightsChart) weightsChart.destroy();
+
+    weightsChart = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [{
+          label: "Weight",
+          data: values,
+          backgroundColor: colors,
+          borderColor: borderColors,
+          borderWidth: 1,
+          borderRadius: 3,
+        }],
+      },
+      options: {
+        indexAxis: "y",
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: "#1f2937",
+            borderColor: "#30363d",
+            borderWidth: 1,
+            callbacks: {
+              label: ctx => " " + Number(ctx.parsed.x).toFixed(4),
+            },
+          },
+        },
+        scales: {
+          x: {
+            grid: { color: "#30363d40" },
+            ticks: { color: "#7d8590" },
+          },
+          y: {
+            grid: { color: "#30363d20" },
+            ticks: { color: "#e6edf3", font: { family: "monospace" } },
+          },
+        },
+      },
+    });
+  }
+
+  // ── Robustness table ───────────────────────────────────────────────────
+  async function loadRobustness() {
+    const res  = await fetch("/api/robustness");
+    const data = await res.json();
+    const tbody = document.getElementById("robustnessBody");
+
+    if (data.error) {
+      tbody.innerHTML = `<tr><td colspan="10">${emptyState(data.error)}</td></tr>`;
+      return;
+    }
+
+    const top10 = data.slice(0, 10);
+    const sharpes = top10.map(r => r.sharpe_ratio).filter(v => v != null);
+    const minS = Math.min(...sharpes);
+    const maxS = Math.max(...sharpes);
+
+    tbody.innerHTML = top10.map((r, i) => {
+      const t = maxS === minS ? 0.5 : (r.sharpe_ratio - minS) / (maxS - minS);
+      const cellBg = heatColor(t, 0.25);
+      const cellBorder = heatColor(t, 0.7);
+
+      return `<tr>
+        <td style="color:var(--text-muted)">${i + 1}</td>
+        <td>${r.ranking_horizon ?? "—"}</td>
+        <td>${r.top_pct != null ? (r.top_pct * 100).toFixed(0) + "%" : "—"}</td>
+        <td>${r.bottom_pct != null ? (r.bottom_pct * 100).toFixed(0) + "%" : "—"}</td>
+        <td>${r.vol_window ?? "—"}</td>
+        <td>${fmtPct(r.cumulative_return)}</td>
+        <td>${fmtPct(r.annualised_return)}</td>
+        <td>${fmtPct(r.annualised_volatility)}</td>
+        <td class="sharpe-cell"
+            style="background:${cellBg};border-left:2px solid ${cellBorder}">
+          ${fmt(r.sharpe_ratio, 3)}
+        </td>
+        <td style="color:var(--red)">${fmtPct(r.max_drawdown)}</td>
+      </tr>`;
+    }).join("");
+  }
+
+  // ── Logs ───────────────────────────────────────────────────────────────
+  async function loadLogs() {
+    const res  = await fetch("/api/logs");
+    const data = await res.json();
+    const container = document.getElementById("logsList");
+
+    if (data.error) {
+      container.innerHTML = emptyState(data.error);
+      return;
+    }
+
+    container.innerHTML = data.map(ev => {
+      const badge = ev.dry_run
+        ? '<span class="log-badge dry">DRY RUN</span>'
+        : '<span class="log-badge live">LIVE</span>';
+
+      const orders = (ev.orders || []).slice(0, 6).map(o => {
+        const side = (o.side || "").toLowerCase().includes("buy") ? "buy" : "sell";
+        return `<span class="order-tag ${side}">${o.symbol}</span>`;
+      }).join("");
+
+      const moreOrders = ev.n_orders > 6
+        ? `<span class="order-tag" style="background:var(--surface-2);color:var(--text-muted)">+${ev.n_orders - 6} more</span>`
+        : "";
+
+      return `<div class="log-card">
+        <span class="log-ts">${fmtTS(ev.timestamp_utc)}</span>
+        ${badge}
+        <div class="log-body">
+          <div class="log-stat">
+            <span class="label">Equity</span>
+            <span class="value">${fmtUSD(ev.equity)}</span>
+          </div>
+          <div class="log-stat">
+            <span class="label">Orders</span>
+            <span class="value">${ev.n_orders}</span>
+          </div>
+          <div class="log-stat">
+            <span class="label">Exposure</span>
+            <span class="value">${fmt(ev.gross_exposure, 1)}×</span>
+          </div>
+        </div>
+        <div class="log-orders">${orders}${moreOrders}</div>
+      </div>`;
+    }).join("");
+  }
+
+  // ── Refresh all ────────────────────────────────────────────────────────
+  async function refreshAll() {
+    await Promise.allSettled([
+      loadEquity(),
+      loadWeights(),
+      loadRobustness(),
+      loadLogs(),
+    ]);
+
+    const now = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+    document.getElementById("lastRefresh").textContent = "Last: " + now;
+  }
+
+  // ── Boot ───────────────────────────────────────────────────────────────
+  refreshAll();
+  setInterval(refreshAll, 60_000);
+</script>
+</body>
+</html>

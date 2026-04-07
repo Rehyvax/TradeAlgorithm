@@ -94,8 +94,13 @@ def load_latest_files(base_dir: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
     return prices, weights
 
 
-def compute_portfolio_returns(prices: pd.DataFrame,weights: pd.DataFrame,cost_bps: float = 5.0) -> pd.Series:
-    """Compute daily portfolio returns with lagged weights.
+def compute_portfolio_returns(
+    prices: pd.DataFrame,
+    weights: pd.DataFrame,
+    cost_bps: float = 5.0,
+    volume_wide: pd.DataFrame | None = None,
+) -> pd.Series:
+    """Compute daily portfolio returns with lagged weights and transaction costs.
 
     Parameters
     ----------
@@ -106,21 +111,49 @@ def compute_portfolio_returns(prices: pd.DataFrame,weights: pd.DataFrame,cost_bp
         short) where rows correspond to dates and columns correspond to
         tickers.  Weights are assumed to sum to zero net exposure
         (long weights sum to 1, short weights sum to ‑1).
+    cost_bps : float, optional
+        Fixed transaction cost in basis points applied to daily turnover.
+        Used only when ``volume_wide`` is ``None``.  Defaults to 5 bps.
+    volume_wide : pandas.DataFrame or None, optional
+        Wide DataFrame of daily share volume (same shape as ``prices``).
+        When provided, transaction costs are estimated using a square-root
+        market-impact model instead of the flat ``cost_bps`` fallback::
+
+            participation_rate = |Δweight| / (price × daily_volume)
+            market_impact_bps  = 10 × √participation_rate
+            daily_cost         = Σ market_impact_bps / 10 000
+
+        This model penalises large trades relative to each asset's
+        liquidity.  When ``None``, ``cost_bps`` is used as a flat charge
+        on total turnover.
 
     Returns
     -------
     pandas.Series
-        Series of daily portfolio returns.  The index aligns with
-        ``prices`` and ``weights`` after the initial shift.
+        Series of daily net portfolio returns.
     """
     asset_returns = prices.pct_change().dropna(how="all")
     w = weights.reindex(asset_returns.index).fillna(0.0)
-    turnover = w.diff().abs().sum(axis=1).fillna(0.0)
     aligned_weights = w.shift(1).fillna(0.0)
     gross_ret = (aligned_weights * asset_returns).sum(axis=1)
-    cost = turnover * (cost_bps / 10_000.0)
-    net_ret = gross_ret - cost
-    return net_ret
+
+    if volume_wide is not None:
+        # Square-root market-impact model
+        p = prices.reindex(asset_returns.index).reindex(columns=w.columns)
+        v = volume_wide.reindex(asset_returns.index).reindex(columns=w.columns)
+        delta_w = w.diff().abs()
+        dollar_vol = p * v
+        with np.errstate(divide="ignore", invalid="ignore"):
+            part_rate = delta_w / dollar_vol
+        part_rate = part_rate.replace([np.inf, -np.inf], np.nan).fillna(0.0)
+        impact_bps = 10.0 * np.sqrt(part_rate)
+        cost = (impact_bps / 10_000.0).sum(axis=1)
+    else:
+        # Flat cost on turnover (fallback)
+        turnover = w.diff().abs().sum(axis=1).fillna(0.0)
+        cost = turnover * (cost_bps / 10_000.0)
+
+    return gross_ret - cost
 
 
 def compute_performance_metrics(returns: pd.Series) -> Dict[str, float]:
@@ -205,8 +238,14 @@ def main() -> None:
     base_dir = Path(__file__).resolve().parent
     # Load latest price and weight files
     prices, weights = load_latest_files(base_dir)
+    # Load volume data for market-impact costs if available
+    vol_files = sorted((base_dir / "data" / "prices").glob("volume_wide_*.csv"))
+    volume_wide = None
+    if vol_files:
+        volume_wide = pd.read_csv(vol_files[-1], index_col=0, parse_dates=True)
+        volume_wide.index.name = "Date"
     # Compute portfolio returns
-    port_ret = compute_portfolio_returns(prices, weights)
+    port_ret = compute_portfolio_returns(prices, weights, volume_wide=volume_wide)
     # Compute performance metrics
     metrics = compute_performance_metrics(port_ret)
     # Plot equity curve

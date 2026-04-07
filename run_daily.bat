@@ -13,4 +13,3 @@ REM Run the bot with the venv python
 "%~dp0.venv\Scripts\python.exe" daily_execution.py >> "data\live\cron.log" 2>&1
 
 echo ===== RUN END %date% %time% =====>> "data\live\cron.log"
-pause

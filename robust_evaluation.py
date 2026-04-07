@@ -45,6 +45,8 @@ live or paper trading execution, see the guidance in
 the main assistant response.
 """
 
+from __future__ import annotations
+
 import os
 import glob
 import datetime as dt
@@ -107,6 +109,7 @@ def run_strategy(
     top_pct: float,
     bottom_pct: float,
     vol_window: int,
+    volume_wide: pd.DataFrame | None = None,
 ) -> dict:
     """Execute a cross‑sectional momentum strategy for a given parameter set.
 
@@ -131,6 +134,16 @@ def run_strategy(
         Rolling window (in trading days) used to estimate
         historical volatility for scaling.  Typical values: 21,
         63, 126.
+    volume_wide : pandas.DataFrame or None, optional
+        Wide DataFrame of daily share volume aligned with ``prices``.
+        When provided, transaction costs are computed with a
+        square-root market-impact model::
+
+            participation_rate = |Δweight| / (price × daily_volume)
+            market_impact_bps  = 10 × √participation_rate
+            daily_cost         = Σ market_impact_bps / 10 000
+
+        When ``None``, a flat 5 bps charge on daily turnover is used.
 
     Returns
     -------
@@ -161,13 +174,29 @@ def run_strategy(
     weight_norm = scaled_signals.abs().sum(axis=1).replace(0.0, np.nan)
     weights = scaled_signals.div(weight_norm, axis=0).fillna(0.0)
     turnover = weights.diff().abs().sum(axis=1).fillna(0.0)
-    cost_bps = 5.0
-    cost = turnover * (cost_bps / 10_000.0)
     gross = (weights.shift(1) * log_returns).sum(axis=1)
+
+    if volume_wide is not None:
+        # Square-root market-impact model
+        p = prices.reindex(index=log_returns.index).reindex(columns=weights.columns)
+        v = volume_wide.reindex(index=log_returns.index).reindex(columns=weights.columns)
+        delta_w = weights.diff().abs()
+        dollar_vol = p * v
+        with np.errstate(divide="ignore", invalid="ignore"):
+            part_rate = delta_w / dollar_vol
+        part_rate = part_rate.replace([np.inf, -np.inf], np.nan).fillna(0.0)
+        impact_bps = 10.0 * np.sqrt(part_rate)
+        cost = (impact_bps / 10_000.0).sum(axis=1)
+        recorded_cost_bps = float(np.nan)
+    else:
+        # Flat 5 bps on turnover (fallback)
+        recorded_cost_bps = 5.0
+        cost = turnover * (recorded_cost_bps / 10_000.0)
+
     port_returns = gross - cost
     # portfolio returns: weights shifted by one day to avoid look‑ahead bias
     metrics = compute_metrics(port_returns)
-    metrics["cost_bps"] = cost_bps
+    metrics["cost_bps"] = recorded_cost_bps
     metrics["avg_turnover"] = float(turnover.mean())
     metrics["total_cost"] = float(cost.sum())
     return {
@@ -191,6 +220,11 @@ def main():
     prices = pd.read_csv(latest_file, index_col=0, parse_dates=True)
     # drop any columns with all NaNs
     prices = prices.dropna(axis=1, how="all")
+    # Load volume data for market-impact costs if available
+    vol_files = sorted(glob.glob(os.path.join(price_dir, "volume_wide_*.csv")))
+    volume_wide = None
+    if vol_files:
+        volume_wide = pd.read_csv(vol_files[-1], index_col=0, parse_dates=True)
     # Parameter grid
     ranking_options = [63, 126, 252]
     percentile_options = [0.1, 0.2, 0.3]
@@ -198,7 +232,7 @@ def main():
     results = []
     # iterate over parameter combinations
     for rh, pct, vw in product(ranking_options, percentile_options, vol_windows):
-        res = run_strategy(prices, rh, pct, pct, vw)
+        res = run_strategy(prices, rh, pct, pct, vw, volume_wide=volume_wide)
         metrics = res["metrics"].copy()
         metrics.update(
             {
@@ -229,6 +263,7 @@ def main():
         top_pct=float(best["top_pct"]),
         bottom_pct=float(best["bottom_pct"]),
         vol_window=int(best["vol_window"]),
+        volume_wide=volume_wide,
     )
     # Save weights and returns for the best config
     best_weights_file = os.path.join(

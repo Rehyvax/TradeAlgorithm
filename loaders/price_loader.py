@@ -194,4 +194,10 @@ def save_prices_panel(prices: pd.DataFrame, base_dir: Path) -> Path:
     wide = prices.pivot(index="Date", columns="Ticker", values="AdjClose").sort_index()
     wide_path = prices_dir / f"adjclose_wide_{stamp}.csv"
     wide.to_csv(wide_path)
+
+    # Pivot daily volume into the same wide format for market-impact cost models
+    vol_wide = prices.pivot(index="Date", columns="Ticker", values="Volume").sort_index()
+    vol_wide_path = prices_dir / f"volume_wide_{stamp}.csv"
+    vol_wide.to_csv(vol_wide_path)
+
     return long_path

@@ -2,285 +2,278 @@
 ml_strategy.py
 ==============
 
-This module implements a simple machine‑learning based
-approach to cross‑sectional momentum.  The objective is
-to use the engineered features (returns of various
-horizons, volatility, drawdown and trend context) as
-inputs to a classifier that predicts whether each
-asset's future return over a given horizon will be
-positive or negative.  The predicted probabilities are
-converted into long/short signals, scaled by inverse
-volatility and normalised similarly to the standard
-momentum strategy.  The resulting portfolio is then
-evaluated using common performance metrics.
+Machine-learning extension of the cross-sectional momentum strategy.
 
-The methodology is inspired by recent research on
-machine‑learning applications to momentum investing,
-which find that simple linear or tree‑based models
-trained on engineered features can modestly improve
-risk‑adjusted returns relative to naïve sorting rules.
-Nevertheless, care must be taken to avoid look‑ahead
-bias, overfitting and data snooping.  Here we use a
-time‑split train/test and normalise features on the
-training data only.
+Each observation is a (date, ticker) pair.  For every such pair the features
+are the per-ticker engineered signals: log returns at five horizons, rolling
+volatility at two windows, rolling drawdown, and a 200-day moving-average
+binary flag.  The target is whether that ticker's 21-day forward log return is
+positive.
+
+The dataset is split strictly by time: the first 70 % of dates form the
+training set, the last 30 % the test set.  A StandardScaler is fitted
+exclusively on training data, then applied to the test set.  A logistic
+regression model is trained on the scaled training set.
+
+At each date in the test period, the model produces a probability score for
+every ticker.  Tickers are ranked cross-sectionally: the top 20 % receive a
+long (+1) signal, the bottom 20 % a short (-1) signal, and the rest are flat.
+Signals are scaled by the inverse of each ticker's 21-day rolling volatility
+and normalised so that the sum of absolute weights equals one on each date.
+
+Portfolio returns are computed as the daily weighted sum of next-day log
+returns, giving a time series that can be evaluated with standard metrics.
 
 Usage::
 
-    python TradeAlgorithm/ml_strategy.py
+    python ml_strategy.py
 
-Prerequisites
--------------
-This script depends on `pandas`, `numpy` and
-`scikit‑learn`.  If `scikit‑learn` is not installed,
-you can install it with `pip install scikit-learn`.
-
-Disclaimer
-----------
-This is a research prototype provided for educational
-purposes.  It is not financial advice, nor is it
-intended for live trading without thorough testing,
-robust risk management and appropriate regulatory
-oversight.
+Prerequisites: pandas, numpy, scikit-learn.
 """
 
-import os
-import glob
+from __future__ import annotations
+
 import datetime as dt
+import glob
+import os
+import warnings
 
 import numpy as np
 import pandas as pd
+from sklearn.exceptions import ConvergenceWarning
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import Pipeline
-from sklearn.exceptions import ConvergenceWarning
-import warnings
 
-# Suppress convergence warnings for logistic regression
-warnings.filterwarnings("ignore", category=ConvergenceWarning)
-
-# Import feature engineering functions from the existing module
 from feature_engineering import build_features
 
+warnings.filterwarnings("ignore", category=ConvergenceWarning)
+
+FEATURE_COLS = [
+    "ret_1d", "ret_5d", "ret_21d", "ret_63d", "ret_252d",
+    "vol_21d", "vol_63d", "drawdown", "above_ma_200",
+]
+
+
+# ---------------------------------------------------------------------------
+# Dataset construction
+# ---------------------------------------------------------------------------
 
 def prepare_ml_dataset(
     prices: pd.DataFrame,
     forward_horizon: int = 21,
-) -> tuple:
-    """Prepare features and labels for ML classification.
+) -> pd.DataFrame:
+    """Build a long-format (date, ticker) dataset with per-ticker features.
 
     Parameters
     ----------
-    prices : pandas.DataFrame
-        Wide DataFrame of adjusted prices with dates as index
-        and tickers as columns.
-    forward_horizon : int, optional
-        Number of days ahead to compute the target return.  The
-        default of 21 corresponds to approximately one month of
-        trading.
+    prices:
+        Wide adjusted-close price DataFrame (dates × tickers).
+    forward_horizon:
+        Days ahead used to compute the binary target.
 
     Returns
     -------
-    X : pandas.DataFrame
-        Design matrix with one row per (date, ticker) and
-        engineered features as columns.
-    y : pandas.Series
-        Binary target indicating whether the forward return
-        exceeds zero.
-    weights_df : pandas.DataFrame
-        Wide DataFrame of rolling volatilities used for
-        scaling signals later.  Index aligned with
-        `prices`.
+    pandas.DataFrame
+        MultiIndex (date, ticker) DataFrame containing FEATURE_COLS plus
+        ``fwd_ret`` and ``target`` columns.  Rows where any feature or the
+        target is NaN are dropped.
     """
-    # Build features using existing module
     feats = build_features(prices)
-    # Extract relevant components
-    returns = feats["returns"]  # log returns
-    volatility = feats["volatility"]  # rolling vol
-    drawdown = feats["drawdown"]  # drawdown
-    trend = feats["trend"]  # above_ma, ma_slope
-    # Flatten hierarchical columns for returns and volatility
-    def flatten(df: pd.DataFrame, prefix: str) -> pd.DataFrame:
-        return df.copy().add_prefix(prefix + "_")
-    returns_flat = flatten(returns, "ret")
-    vol_flat = flatten(volatility, "vol")
-    dd_flat = flatten(drawdown.to_frame(), "dd")
-    trend_flat = trend.copy()
-    trend_flat.columns = [f"{col}_{ticker}" if ticker != "" else col for col, ticker in trend_flat.columns]
-    # Align all features by index
-    all_feats = pd.concat([returns_flat, vol_flat, dd_flat, trend_flat], axis=1)
-    # Drop rows with any missing values
-    all_feats.dropna(inplace=True)
-    # Forward returns for target
-    future_prices = prices.shift(-forward_horizon)
-    forward_returns = np.log(future_prices / prices)
-    # Align with features index
-    forward_returns = forward_returns.reindex(all_feats.index)
-    # Flatten target to long format matching features
-    X_list = []
-    y_list = []
-    vol_list = []
-    # To avoid huge memory usage, iterate over dates and tickers
-    for date in all_feats.index:
-        # row of features for all assets on this date
-        feat_row = all_feats.loc[date]
-        # Reshape to long: features per ticker
-        tickers = prices.columns
-        for tkr in tickers:
-            # Only include if target and vol are available
-            if (
-                tkr in forward_returns.columns
-                and not pd.isna(forward_returns.loc[date, tkr])
-                and not pd.isna(volatility.loc[date, tkr])
-            ):
-                # Build a dict for this asset
-                feat_dict = {}
-                # For each return horizon feature
-                for col in returns.columns:
-                    feat_dict[f"ret_{col}"] = returns.loc[date, col]
-                for col in volatility.columns:
-                    feat_dict[f"vol_{col}"] = volatility.loc[date, col]
-                # Drawdown: same for all tickers on this date
-                feat_dict["drawdown"] = drawdown.loc[date]
-                # Trend context
-                feat_dict[f"above_ma_{tkr}"] = trend.loc[date, ("above_ma", tkr)]
-                feat_dict[f"ma_slope_{tkr}"] = trend.loc[date, ("ma_slope", tkr)]
-                X_list.append(feat_dict)
-                y_list.append(1.0 if forward_returns.loc[date, tkr] > 0 else 0.0)
-                vol_list.append(volatility.loc[date, tkr])
-    X = pd.DataFrame(X_list)
-    y = pd.Series(y_list)
-    vol_series = pd.Series(vol_list)
-    return X, y, vol_series
+
+    # build_features returns MultiIndex-column DataFrames:
+    #   returns   → level-0 keys like "ret_1d", level-1 = ticker
+    #   volatility → level-0 keys like "vol_21d", level-1 = ticker
+    #   drawdown  → plain wide (dates × tickers)
+    #   trend     → MultiIndex with names ["feature", "asset"],
+    #               level-0 values "above_ma" / "ma_slope"
+    returns = feats["returns"]
+    vol     = feats["volatility"]
+    dd      = feats["drawdown"]
+    trend   = feats["trend"]
+
+    fwd_ret = np.log(prices.shift(-forward_horizon) / prices)
+
+    # Stack each wide DataFrame to a (date, ticker) Series, keeping NaNs so
+    # that all series align before the final dropna.
+    def to_long(wide: pd.DataFrame, name: str) -> pd.Series:
+        s = wide.stack()
+        s.name = name
+        return s
+
+    parts = [
+        to_long(returns["ret_1d"],   "ret_1d"),
+        to_long(returns["ret_5d"],   "ret_5d"),
+        to_long(returns["ret_21d"],  "ret_21d"),
+        to_long(returns["ret_63d"],  "ret_63d"),
+        to_long(returns["ret_252d"], "ret_252d"),
+        to_long(vol["vol_21d"],      "vol_21d"),
+        to_long(vol["vol_63d"],      "vol_63d"),
+        to_long(dd,                  "drawdown"),
+        to_long(trend["above_ma"],   "above_ma_200"),
+        to_long(fwd_ret,             "fwd_ret"),
+    ]
+
+    df = pd.concat(parts, axis=1)
+    df.index.names = ["date", "ticker"]
+    df = df.dropna(subset=FEATURE_COLS + ["fwd_ret"])
+    df["target"] = (df["fwd_ret"] > 0).astype(float)
+    return df
 
 
-def train_test_ml_strategy(prices: pd.DataFrame) -> dict:
-    """Train a logistic regression model and evaluate its performance.
+# ---------------------------------------------------------------------------
+# Training and signal generation
+# ---------------------------------------------------------------------------
+
+def train_ml_strategy(prices: pd.DataFrame) -> dict:
+    """Train the ML strategy and compute test-period portfolio returns.
 
     Parameters
     ----------
-    prices : pandas.DataFrame
-        Wide DataFrame of adjusted prices with dates as index
-        and tickers as columns.
+    prices:
+        Wide adjusted-close price DataFrame (dates × tickers).
 
     Returns
     -------
-    dict
-        Dictionary containing the trained model, performance
-        metrics and the series of portfolio returns.
+    dict with keys:
+        ``model``   – fitted LogisticRegression,
+        ``scaler``  – fitted StandardScaler,
+        ``metrics`` – performance metric dictionary,
+        ``returns`` – daily portfolio return Series (test period),
+        ``weights`` – wide weight DataFrame (test dates × tickers).
     """
-    # Prepare dataset
-    X, y, vol_series = prepare_ml_dataset(prices)
-    # Convert to numpy arrays
-    X_vals = X.values.astype(float)
-    y_vals = y.values.astype(int)
-    # Train/test split by time (first 70% train, last 30% test)
-    split = int(0.7 * len(X_vals))
-    X_train, X_test = X_vals[:split], X_vals[split:]
-    y_train, y_test = y_vals[:split], y_vals[split:]
-    vol_train, vol_test = vol_series.iloc[:split], vol_series.iloc[split:]
-    # Build pipeline: standardise features then logistic regression
-    clf = Pipeline(
-        [
-            ("scaler", StandardScaler()),
-            ("logreg", LogisticRegression(max_iter=200)),
-        ]
+    df = prepare_ml_dataset(prices)
+
+    # ---- strict temporal train / test split --------------------------------
+    all_dates = df.index.get_level_values("date").unique().sort_values()
+    split_idx = int(len(all_dates) * 0.7)
+    train_dates = all_dates[:split_idx]
+    test_dates  = all_dates[split_idx:]
+
+    in_train = df.index.get_level_values("date").isin(train_dates)
+    in_test  = df.index.get_level_values("date").isin(test_dates)
+
+    X_train = df.loc[in_train, FEATURE_COLS].to_numpy(dtype=float)
+    y_train = df.loc[in_train, "target"].to_numpy(dtype=int)
+    X_test  = df.loc[in_test,  FEATURE_COLS].to_numpy(dtype=float)
+
+    # ---- scaler fitted on train only ---------------------------------------
+    scaler = StandardScaler()
+    X_train_sc = scaler.fit_transform(X_train)
+    X_test_sc  = scaler.transform(X_test)
+
+    # ---- logistic regression -----------------------------------------------
+    clf = LogisticRegression(max_iter=500)
+    clf.fit(X_train_sc, y_train)
+
+    # ---- cross-sectional signals on test set --------------------------------
+    test_df = df.loc[in_test].copy()
+    test_df["prob"] = clf.predict_proba(X_test_sc)[:, 1]
+
+    # Rank predicted probabilities cross-sectionally within each date
+    test_df["prob_rank"] = (
+        test_df.groupby(level="date")["prob"]
+        .rank(pct=True, method="first")
     )
-    clf.fit(X_train, y_train)
-    # Probabilities for positive return on test set
-    probs = clf.predict_proba(X_test)[:, 1]
-    # Determine thresholds for long/short: top 20% long, bottom 20% short
-    ranks = pd.Series(probs).rank(pct=True, method="first")
-    signals = pd.Series(0.0, index=ranks.index)
-    signals[ranks >= 0.8] = 1.0
-    signals[ranks <= 0.2] = -1.0
-    # Scale by inverse volatility from vol_test
-    scaled_signals = signals / vol_test.values
-    # Normalise
-    denom = np.sum(np.abs(scaled_signals))
-    if denom > 0:
-        weights = scaled_signals / denom
-    else:
-        weights = scaled_signals
-    # Compute portfolio returns using subsequent 1‑day returns
-    # For simplicity, assume daily returns equal to log_returns vectorised from price panel
-    # Extract dates corresponding to test set rows (approx.)
-    # As we flattened features, we lost explicit dates; reuse chronological order in prices
-    log_returns = np.log(prices / prices.shift(1))
-    log_returns = log_returns.dropna(how="all")
-    # Align to test length; this is approximate due to flattening; use last len(X_test) days
-    # Build weighted average returns for each test instance; this is a simplification.
-    # For a more precise implementation, one would need to keep track of asset and date per sample.
-    port_ret = []
-    idx = -len(X_test)
-    for i in range(len(X_test)):
-        # weight applied to overall cross‑section equally
-        daily_ret = log_returns.iloc[idx + i].mean()
-        port_ret.append(weights[i] * daily_ret)
-    port_ret = pd.Series(port_ret)
-    metrics = compute_metrics(port_ret)
+
+    test_df["signal"] = 0.0
+    test_df.loc[test_df["prob_rank"] >= 0.8, "signal"] =  1.0
+    test_df.loc[test_df["prob_rank"] <= 0.2, "signal"] = -1.0
+
+    # ---- volatility-scaled, normalised weights per date --------------------
+    safe_vol = test_df["vol_21d"].replace(0.0, np.nan)
+    raw_w = (test_df["signal"] / safe_vol).replace([np.inf, -np.inf], np.nan).fillna(0.0)
+    denom = raw_w.abs().groupby(level="date").transform("sum")
+    test_df["weight"] = raw_w.where(denom == 0, raw_w / denom)
+
+    # ---- portfolio returns: weight[t] · next-day-return[t+1] ---------------
+    daily_ret = np.log(prices / prices.shift(1))
+
+    weights_wide = test_df["weight"].unstack(level="ticker")   # dates × tickers
+    ret_wide     = daily_ret.reindex(columns=weights_wide.columns)
+
+    # shift(-1) aligns each weight row with the following day's return
+    next_ret = ret_wide.shift(-1)
+
+    common = weights_wide.index.intersection(next_ret.index)
+    port_series = (
+        (weights_wide.loc[common] * next_ret.loc[common])
+        .sum(axis=1)
+    )
+    port_series.name = "portfolio_return"
+    port_series.index.name = "date"
+
+    metrics = compute_metrics(port_series)
+
     return {
-        "model": clf,
+        "model":   clf,
+        "scaler":  scaler,
         "metrics": metrics,
-        "returns": port_ret,
+        "returns": port_series,
+        "weights": weights_wide,
     }
 
+
+# ---------------------------------------------------------------------------
+# Performance metrics
+# ---------------------------------------------------------------------------
 
 def compute_metrics(portfolio_returns: pd.Series) -> dict:
-    """Reuse the metrics function from robust_evaluation script."""
+    """Compute annualised performance metrics from a daily return series."""
     r = portfolio_returns.dropna().astype(float)
     if r.empty:
-        return {
-            "cumulative_return": np.nan,
-            "annualised_return": np.nan,
-            "annualised_volatility": np.nan,
-            "sharpe_ratio": np.nan,
-            "max_drawdown": np.nan,
-        }
-    cumulative = (1 + r).prod() - 1
-    periods_per_year = 252
-    ann_return = (1 + cumulative) ** (periods_per_year / len(r)) - 1
-    ann_vol = r.std() * np.sqrt(periods_per_year)
-    sharpe = ann_return / ann_vol if ann_vol != 0 else np.nan
-    cum_curve = (1 + r).cumprod()
-    running_max = cum_curve.cummax()
-    drawdown = cum_curve / running_max - 1.0
-    max_dd = drawdown.min()
+        return dict.fromkeys(
+            ["cumulative_return", "annualised_return",
+             "annualised_volatility", "sharpe_ratio", "max_drawdown"],
+            np.nan,
+        )
+    n = len(r)
+    cumulative  = (1 + r).prod() - 1
+    ann_return  = (1 + cumulative) ** (252 / n) - 1
+    ann_vol     = r.std() * np.sqrt(252)
+    sharpe      = ann_return / ann_vol if ann_vol != 0 else np.nan
+    cum_curve   = (1 + r).cumprod()
+    max_dd      = (cum_curve / cum_curve.cummax() - 1).min()
     return {
-        "cumulative_return": cumulative,
-        "annualised_return": ann_return,
+        "cumulative_return":    cumulative,
+        "annualised_return":    ann_return,
         "annualised_volatility": ann_vol,
-        "sharpe_ratio": sharpe,
-        "max_drawdown": max_dd,
+        "sharpe_ratio":         sharpe,
+        "max_drawdown":         max_dd,
     }
 
 
-def main():
-    # Locate latest price panel
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
+def main() -> None:
     price_dir = os.path.join("data", "prices")
-    pattern = os.path.join(price_dir, "adjclose_wide_*.csv")
-    files = sorted(glob.glob(pattern))
+    files = sorted(glob.glob(os.path.join(price_dir, "adjclose_wide_*.csv")))
     if not files:
         raise FileNotFoundError(
             f"No price files found in {price_dir}. Run trade_algorithm.py first."
         )
-    latest_file = files[-1]
-    prices = pd.read_csv(latest_file, index_col=0, parse_dates=True)
-    # Drop all‑NaN columns
+
+    prices = pd.read_csv(files[-1], index_col=0, parse_dates=True)
     prices = prices.dropna(axis=1, how="all")
-    # Run ML strategy
-    result = train_test_ml_strategy(prices)
+
+    result = train_ml_strategy(prices)
+
     print("ML strategy performance metrics:")
     for k, v in result["metrics"].items():
-        print(f"{k}: {v:.4f}")
-    # Save returns
+        print(f"  {k}: {v:.4f}")
+
     signals_dir = os.path.join("data", "signals")
     os.makedirs(signals_dir, exist_ok=True)
     today_str = dt.date.today().isoformat()
-    returns_file = os.path.join(
-        signals_dir, f"ml_returns_{today_str}.csv"
-    )
+
+    returns_file = os.path.join(signals_dir, f"ml_returns_{today_str}.csv")
     result["returns"].to_csv(returns_file, index=True, header=["return"])
     print(f"Saved ML strategy returns to {returns_file}")
+
+    weights_file = os.path.join(signals_dir, f"ml_weights_{today_str}.csv")
+    result["weights"].to_csv(weights_file)
+    print(f"Saved ML weights to {weights_file}")
 
 
 if __name__ == "__main__":
