@@ -28,3 +28,4 @@
 {"timestamp_utc": "2026-05-06T22:13:38.744750+00:00", "equity": 97533.77, "dry_run": false, "gross_exposure": 0.98, "long_only": true, "orders": []}
 {"timestamp_utc": "2026-05-07T22:34:47.653046+00:00", "equity": 97136.56, "dry_run": false, "gross_exposure": 0.98, "long_only": true, "orders": []}
 {"timestamp_utc": "2026-05-08T22:29:45.838980+00:00", "equity": 97540.52, "dry_run": false, "gross_exposure": 0.98, "long_only": true, "orders": [{"symbol": "EEM", "notional": 1112.98, "side": "OrderSide.SELL", "id": "ac08b3c2-e71b-47f2-b1ff-5f52455db5fa", "status": "SUBMITTED"}]}
+{"timestamp_utc": "2026-05-11T22:32:57.177692+00:00", "equity": 97843.22, "dry_run": false, "gross_exposure": 0.98, "long_only": true, "orders": []}
