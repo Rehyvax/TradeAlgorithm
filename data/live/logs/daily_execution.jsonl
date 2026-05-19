@@ -34,3 +34,4 @@
 {"timestamp_utc": "2026-05-14T22:36:46.063098+00:00", "equity": 97490.7, "dry_run": false, "gross_exposure": 0.98, "long_only": true, "orders": []}
 {"timestamp_utc": "2026-05-15T22:30:04.745194+00:00", "equity": 96313.03, "dry_run": false, "gross_exposure": 0.98, "long_only": true, "orders": []}
 {"timestamp_utc": "2026-05-18T22:32:29.601727+00:00", "equity": 96416.39, "dry_run": false, "gross_exposure": 0.98, "long_only": true, "orders": []}
+{"timestamp_utc": "2026-05-19T22:44:44.205453+00:00", "equity": 95808.27, "dry_run": false, "gross_exposure": 0.98, "long_only": true, "orders": [{"symbol": "GLD", "notional": 1002.54, "side": "OrderSide.BUY", "id": "4cab3739-4659-448b-9031-3bfacbf4d2ec", "status": "SUBMITTED"}]}
