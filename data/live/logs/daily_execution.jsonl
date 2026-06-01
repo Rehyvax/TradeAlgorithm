@@ -43,3 +43,4 @@
 {"timestamp_utc": "2026-05-27T22:56:19.952063+00:00", "equity": 96744.15, "dry_run": false, "gross_exposure": 0.98, "long_only": true, "orders": []}
 {"timestamp_utc": "2026-05-28T22:52:21.823581+00:00", "equity": 97075.47, "dry_run": false, "gross_exposure": 0.98, "long_only": true, "orders": []}
 {"timestamp_utc": "2026-05-29T22:50:47.593279+00:00", "equity": 97095.76, "dry_run": false, "gross_exposure": 0.98, "long_only": true, "orders": []}
+{"timestamp_utc": "2026-06-01T23:13:37.136400+00:00", "equity": 97271.83, "dry_run": false, "gross_exposure": 0.98, "long_only": true, "orders": []}
