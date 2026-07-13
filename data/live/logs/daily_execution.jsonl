@@ -71,3 +71,4 @@
 {"timestamp_utc": "2026-07-08T22:32:33.691349+00:00", "equity": 93709.12, "dry_run": false, "gross_exposure": 0.9148067233387536, "long_only": true, "orders": []}
 {"timestamp_utc": "2026-07-09T22:49:41.148016+00:00", "equity": 93923.97, "dry_run": false, "gross_exposure": 0.9176017677649208, "long_only": true, "orders": []}
 {"timestamp_utc": "2026-07-10T22:32:17.108151+00:00", "equity": 93876.51, "dry_run": false, "gross_exposure": 0.9192816585963999, "long_only": true, "orders": []}
+{"timestamp_utc": "2026-07-13T22:27:08.648232+00:00", "equity": 93652.73, "dry_run": false, "gross_exposure": 0.9290516843157247, "long_only": true, "orders": [{"symbol": "LQD", "notional": 10053.69, "side": "OrderSide.SELL", "id": "1a54106c-f1bc-4007-aa36-f50d0f16b0ca", "status": "SUBMITTED"}, {"symbol": "TIP", "notional": 7226.52, "side": "OrderSide.BUY", "id": "1c725af1-50ba-4187-8376-69490d5ea50a", "status": "SUBMITTED"}]}
