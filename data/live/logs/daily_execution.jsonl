@@ -89,3 +89,4 @@
 {"timestamp_utc": "2026-08-03T22:33:13.866358+00:00", "equity": 94455.77, "dry_run": false, "gross_exposure": 0.9168003445887184, "long_only": true, "orders": []}
 {"timestamp_utc": "2026-08-04T22:35:41.058409+00:00", "equity": 94713.09, "dry_run": false, "gross_exposure": 0.9232217469568729, "long_only": true, "orders": [{"symbol": "USO", "notional": 1035.35, "side": "OrderSide.BUY", "id": "c7f835f4-066f-4bc7-8132-93c7925804f0", "status": "SUBMITTED"}]}
 {"timestamp_utc": "2026-08-05T22:34:30.746926+00:00", "equity": 95100.12, "dry_run": false, "gross_exposure": 0.9313628277798173, "long_only": true, "orders": []}
+{"timestamp_utc": "2026-08-07T01:03:24.832087+00:00", "equity": 95086.18, "dry_run": false, "gross_exposure": 0.933736304471784, "long_only": true, "orders": []}
