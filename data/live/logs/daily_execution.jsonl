@@ -104,3 +104,4 @@
 {"timestamp_utc": "2026-08-24T21:53:32.323634+00:00", "equity": 97976.29, "dry_run": false, "gross_exposure": 0.925493989701213, "long_only": true, "orders": []}
 {"timestamp_utc": "2026-08-25T21:53:22.917699+00:00", "equity": 98001.64, "dry_run": false, "gross_exposure": 0.9340081086970142, "long_only": true, "orders": [{"symbol": "IWN", "notional": 1131.26, "side": "OrderSide.BUY", "id": "b4c3f269-ebbf-4dd0-ad72-f4f2c0967981", "status": "SUBMITTED"}]}
 {"timestamp_utc": "2026-08-27T00:57:35.986822+00:00", "equity": 97858.3, "dry_run": false, "gross_exposure": 0.9396414485239913, "long_only": true, "orders": []}
+{"timestamp_utc": "2026-08-28T05:32:27.419680+00:00", "equity": 97898.81, "dry_run": false, "gross_exposure": 0.9414863383719512, "long_only": true, "orders": []}
