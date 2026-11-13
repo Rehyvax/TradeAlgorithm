@@ -159,3 +159,4 @@
 {"timestamp_utc": "2026-11-10T03:42:47.713962+00:00", "equity": 94910.55, "halt_reason": "max_drawdown_exceeded", "gross_exposure": 0.98}
 {"timestamp_utc": "2026-11-11T01:22:18.516441+00:00", "equity": 94534.19, "halt_reason": "max_drawdown_exceeded", "gross_exposure": 0.98}
 {"timestamp_utc": "2026-11-12T02:23:13.530123+00:00", "equity": 94690.76, "halt_reason": "max_drawdown_exceeded", "gross_exposure": 0.98}
+{"timestamp_utc": "2026-11-13T02:01:17.435524+00:00", "equity": 94129.92, "halt_reason": "max_drawdown_exceeded", "gross_exposure": 0.98}
