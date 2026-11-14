@@ -727,7 +727,14 @@ def main(
         rebalance_band=rebalance_band,
         min_notional_usd=min_trade_usd,
     )
-    orders = apply_cash_budget(orders, cash_available=cash, cash_buffer_usd=max(50.0, 0.01 * equity))
+    expected_proceeds = sum(
+        float(o["notional"]) for o in orders if str(o["side"]) == str(OrderSide.SELL)
+    )
+    orders = apply_cash_budget(
+        orders,
+        cash_available=cash + expected_proceeds,
+        cash_buffer_usd=max(50.0, 0.01 * equity),
+    )
 
     # Step H: Submit orders
     results = submit_orders(trading, orders, dry_run=dry_run)
