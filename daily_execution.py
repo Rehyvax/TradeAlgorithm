@@ -610,6 +610,7 @@ def main(
     dirs["live"].mkdir(parents=True, exist_ok=True)
     dirs["logs"].mkdir(parents=True, exist_ok=True)
     run_flag = dirs["live"] / f"last_run_{datetime.now(timezone.utc).date().isoformat()}.flag"
+    # The daily lock protects real runs only, so dry runs can be repeated.
     if not dry_run and run_flag.exists():
         print("[SKIP] Already ran today. Exiting to avoid duplicate trading.")
         return
@@ -727,6 +728,9 @@ def main(
         rebalance_band=rebalance_band,
         min_notional_usd=min_trade_usd,
     )
+    # Sells and buys go out together, so the cash that the sells will free
+    # counts towards the buy budget.  Without this the buys are scaled down
+    # to the cash on hand and a large rebalance takes two days.
     expected_proceeds = sum(
         float(o["notional"]) for o in orders if str(o["side"]) == str(OrderSide.SELL)
     )

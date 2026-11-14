@@ -16,6 +16,7 @@ python trade_algorithm.py          # Download & validate prices from Yahoo Finan
 python trend_strategy.py           # Core strategy: backtest, benchmarks, robustness table
 python thematic_sleeve.py          # Thematic sleeve vs buy-and-hold basket (downloads stock prices)
 python short_horizon_study.py      # Short-window momentum / reversal study (downloads prices)
+python make_figures.py             # Rebuild the README figures in screenshots/
 
 # Legacy research (original cross-sectional strategy)
 python signal_generation.py        # Generate cross-sectional momentum signals & weights
@@ -73,7 +74,8 @@ daily_execution.py      → Alpaca paper API → data/live/equity_history.csv
 - **Kill-switch**: at `2 * max_drawdown` the account moves to cash for 21 runs, then re-arms.
 - **Volatility scaling**: scales exposure down if realised volatility exceeds `target_vol`.
 - **Rebalance band**: skips position changes smaller than `rebalance_band` (default 2%) of equity.
-- **Cash budget**: ensures buy orders don't exceed available cash after a safety buffer.
+- **Cash budget**: buy orders may use available cash plus the expected proceeds of the same run's sells, minus a buffer of 1% of equity.
+- **Daily lock**: `data/live/last_run_YYYY-MM-DD.flag` blocks a second real run on the same day; dry runs skip it.
 
 ### Data conventions
 

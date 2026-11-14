@@ -71,6 +71,8 @@ Applied in `daily_execution.py` on the account equity:
 | Drawdown scaling | Exposure is 100 % above a 5 % drawdown from the 252-run peak and falls linearly to 35 % at 10 %. It rises again as the account recovers. |
 | Volatility scaling | Exposure is multiplied by `min(1, 10 % / realised 63-run volatility)`. |
 | Kill-switch | At a 20 % drawdown the account moves to cash for 21 runs, then re-arms with a fresh reference peak and re-enters at 35 % exposure. |
+| Cash budget | Sells and buys are sent together and the buy budget counts the cash the sells will free, less a buffer of 1 % of equity, so a full rebalance completes in one run. |
+| Daily lock | A real run writes a lock file and a second real run on the same day exits. Dry runs ignore the lock and can be repeated. |
 
 ---
 
@@ -169,6 +171,8 @@ Reading these numbers correctly matters more than the numbers themselves:
 - The 90 % bootstrap interval of the Sharpe ratio is 0.07 to 1.02. Sixteen years are not enough to pin it down more precisely.
 - Realised volatility (5.4 %) is below the 10 % target because the book cannot use leverage and bond ETFs absorb much of the risk budget.
 
+![Core sleeve against passive benchmarks](screenshots/trend_equity.png)
+
 **Robustness.** Twenty neighbouring configurations were evaluated (lookback sets, volatility windows, targets, rebalance frequency, bands, tilts, costs). Sharpe ratios range from 0.31 to 0.58 and the Deflated Sharpe Ratio of the baseline is 0.94. Three sensitivities are worth knowing:
 
 | Variation | Sharpe ratio |
@@ -180,6 +184,8 @@ Reading these numbers correctly matters more than the numbers themselves:
 | Single weekly rebalance, by weekday | 0.43 to 0.54 |
 
 The last row is the reason for the staggered rebalance: with one rebalance per week the Sharpe ratio moved by 0.1 depending only on the weekday chosen, which is luck and not a property of the strategy.
+
+![Robustness of the core sleeve](screenshots/trend_robustness.png)
 
 ### 3. Short-window momentum in semiconductors
 
@@ -209,11 +215,13 @@ Sharpe ratio of "hold SMH when its k-day return is positive, otherwise cash":
 | k = 63 days | 0.61 | 0.88 | 1.14 | 0.97 |
 | k = 126 days | 0.59 | 0.87 | 1.22 | 0.99 |
 
-Across 19 large semiconductor stocks since 2005, rules with k between 1 and 5 days beat buy and hold in 0 or 1 stocks, with a median Sharpe ratio between -0.05 and 0.18 against 0.57 for holding.
+Since 2005, no rule with k between 1 and 5 days beats buy and hold in any of the eight semiconductor tickers in the study (SMH, SOXX, NVDA, MU, AVGO, MRVL, AMD, TSM). The same holds for SPY and QQQ.
+
+![Short-window momentum in semiconductors](screenshots/short_horizon.png)
 
 **Conclusion.** The hypothesis is rejected. At horizons of one to five days the sector mean-reverts: the day after a fall is, on average, the good day, and the day after a rise is flat. This agrees with the literature, where short-horizon continuation appears at the one-month horizon for industries and high-turnover stocks (Medhat & Schmeling, 2022; Gao, Li, Yuan & Zhou, 2026) and not at the horizon of days, where reversal dominates (Lehmann, 1990).
 
-In 2026 the 2-day and 3-day rules did roughly match buy and hold on SMH with a smaller drawdown, which explains the impression. The 5-day rule lost money over the same months. A result that changes sign between k = 3 and k = 5 on 218 observations is noise, and a rule that trades 60 to 80 times a year also carries broker, currency and tax costs that the 5 bps assumption does not cover.
+2026 is the exception that explains the impression. The 3-day rule beat buy and hold in five of the eight tickers (SMH 1.23 against 0.83, SOXX 1.53 against 0.99, MU 2.77 against 1.60, AMD 2.05 against 1.65, AVGO 0.32 against 0.17) and lost in NVDA, MRVL and TSM. The 2-day rule won in two and the 5-day rule lost money on SMH. This is not enough to change the conclusion. The standard error of a Sharpe ratio measured over less than one year is close to 1, the sector was chosen after it rallied, and the same rules fail in every longer window. The 3-day rule on SMH is frozen as written and followed out of sample before any decision. A rule that trades 60 to 80 times a year also carries broker, currency and tax costs that the 5 bps assumption does not cover.
 
 ### 4. Thematic sleeve
 
@@ -221,14 +229,16 @@ Equal-weighted basket of the 19 stocks in `data/universe_thematic.csv`, data to 
 
 | Period | Portfolio | Sharpe | Annualised return | Volatility | Max drawdown |
 |---|---|---|---|---|---|
-| Since 2006 | Sleeve | 0.75 | 13.7 % | 16.6 % | -25 % |
-| | Basket, buy and hold | 0.74 | 22.4 % | 32.3 % | -67 % |
-| Since 2016 | Sleeve | 0.97 | 20.4 % | 18.6 % | -22 % |
-| | Basket, buy and hold | 0.97 | 34.9 % | 34.6 % | -44 % |
-| Since 2023 | Sleeve | 1.22 | 30.3 % | 19.6 % | -18 % |
-| | Basket, buy and hold | 1.18 | 52.2 % | 37.7 % | -40 % |
+| Since 2006 | Sleeve | 0.74 | 13.9 % | 16.6 % | -25.0 % |
+| | Basket, buy and hold | 0.72 | 22.4 % | 32.3 % | -66.6 % |
+| Since 2016 | Sleeve | 0.98 | 19.9 % | 18.6 % | -23.9 % |
+| | Basket, buy and hold | 0.99 | 34.9 % | 34.6 % | -44.4 % |
+| Since 2023 | Sleeve | 1.25 | 29.7 % | 19.6 % | -17.3 % |
+| | Basket, buy and hold | 1.21 | 52.2 % | 37.7 % | -39.6 % |
 
-The sleeve has the same Sharpe ratio as holding the basket. It does not add return per unit of risk; it halves the risk and cuts the worst drawdown from -67 % to -25 %. The same holds for SMH, QQQ and a set of 22 sector ETFs. Trend and volatility rules on equities are risk management, and should be judged as such.
+The sleeve has the same Sharpe ratio as holding the basket. It does not add return per unit of risk; it halves the risk and cuts the worst drawdown from -67 % to -25 %.
+
+![Thematic sleeve against the basket](screenshots/thematic_sleeve.png) The same holds for SMH, QQQ and a set of 22 sector ETFs. Trend and volatility rules on equities are risk management, and should be judged as such.
 
 Two caveats. The 19 tickers are today's survivors, so the return of the basket is overstated; the comparison between sleeve and basket is the valid claim. A five-day reversal tilt (buy more after falls) looked promising on single assets and with daily trading, but added nothing at a weekly rebalance and is disabled by default.
 
@@ -299,10 +309,13 @@ python thematic_sleeve.py
 # 4. Short-window momentum and reversal study
 python short_horizon_study.py
 
-# 5. Daily paper trading execution
+# 5. Rebuild the figures in screenshots/ from the outputs of steps 2 to 4
+python make_figures.py
+
+# 6. Daily paper trading execution
 python daily_execution.py
 
-# 6. Launch the monitoring dashboard
+# 7. Launch the monitoring dashboard
 python dashboard_server.py
 # open http://localhost:5050
 
