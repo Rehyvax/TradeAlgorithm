@@ -304,7 +304,7 @@ def _compare_results(
     """Print a side-by-side Sharpe comparison against the original walk-forward."""
     orig_files = sorted(glob.glob(original_csv_pattern))
     if not orig_files:
-        print("(Original walk-forward results not found — skipping comparison)")
+        print("(Original walk-forward results not found - skipping comparison)")
         return
 
     orig_df = pd.read_csv(orig_files[-1])

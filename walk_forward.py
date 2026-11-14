@@ -24,8 +24,8 @@ Usage::
     python walk_forward.py
 
 Outputs (written to ``data/signals/``):
-  - ``walk_forward_results_YYYY-MM-DD.csv``  — one row per test window
-  - ``walk_forward_returns_YYYY-MM-DD.csv``  — concatenated OOS daily returns
+  - ``walk_forward_results_YYYY-MM-DD.csv``  - one row per test window
+  - ``walk_forward_returns_YYYY-MM-DD.csv``  - concatenated OOS daily returns
 """
 
 from __future__ import annotations
@@ -119,10 +119,10 @@ def run_walk_forward(
         n_test_rows  = test_mask.sum()
 
         if n_train_rows < 300:
-            print(f"  [{i+1}/{len(windows)}] SKIP — only {n_train_rows} train rows")
+            print(f"  [{i+1}/{len(windows)}] SKIP - only {n_train_rows} train rows")
             continue
         if n_test_rows == 0:
-            print(f"  [{i+1}/{len(windows)}] SKIP — no test rows in range")
+            print(f"  [{i+1}/{len(windows)}] SKIP - no test rows in range")
             continue
 
         # ── Grid search on TRAIN data ──────────────────────────────────────
@@ -139,7 +139,7 @@ def run_walk_forward(
                 best_params = (rh, pct, vw)
 
         if best_params is None:
-            print(f"  [{i+1}/{len(windows)}] SKIP — no valid combo found on train data")
+            print(f"  [{i+1}/{len(windows)}] SKIP - no valid combo found on train data")
             continue
 
         rh, pct, vw = best_params

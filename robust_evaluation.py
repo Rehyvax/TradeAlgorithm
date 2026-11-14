@@ -23,9 +23,9 @@ The methodology follows best practices described in
 the academic literature on cross‑sectional momentum
 and risk management.  In particular, we use
 multi‑horizon ranking of log returns to identify
-relative winners and losers【416002924589760†L24-L33】
+relative winners and losers
 and scale positions inversely to recent volatility
-to mitigate crash risk【416002924589760†L81-L113】.
+to mitigate crash risk.
 
 Usage::
 
@@ -41,8 +41,7 @@ Notes
 -----
 This script is meant for offline research.  It does
 not place trades or interact with any broker.  For
-live or paper trading execution, see the guidance in
-the main assistant response.
+live or paper trading execution, see ``daily_execution.py``.
 """
 
 from __future__ import annotations
@@ -110,6 +109,7 @@ def run_strategy(
     bottom_pct: float,
     vol_window: int,
     volume_wide: pd.DataFrame | None = None,
+    capital: float = 100_000.0,
 ) -> dict:
     """Execute a cross‑sectional momentum strategy for a given parameter set.
 
@@ -139,7 +139,7 @@ def run_strategy(
         When provided, transaction costs are computed with a
         square-root market-impact model::
 
-            participation_rate = |Δweight| / (price × daily_volume)
+            participation_rate = |Δweight| × capital / (price × daily_volume)
             market_impact_bps  = 10 × √participation_rate
             daily_cost         = Σ market_impact_bps / 10 000
 
@@ -183,7 +183,7 @@ def run_strategy(
         delta_w = weights.diff().abs()
         dollar_vol = p * v
         with np.errstate(divide="ignore", invalid="ignore"):
-            part_rate = delta_w / dollar_vol
+            part_rate = delta_w * capital / dollar_vol
         part_rate = part_rate.replace([np.inf, -np.inf], np.nan).fillna(0.0)
         impact_bps = 10.0 * np.sqrt(part_rate)
         cost = (impact_bps / 10_000.0).sum(axis=1)

@@ -5,10 +5,9 @@ adjusts them using **volatility scaling**, following best practices in
 quantitative finance.  Unlike time‑series momentum, which takes signals from
 an asset’s own past returns, cross‑sectional momentum ranks assets relative
 to each other: the strongest performers are bought and the weakest are
-sold【416002924589760†L24-L33】.  Research shows that portfolio design choices
-(ranking horizon, weighting scheme) materially affect returns and risk
-【511009017126348†L84-L96】, and that scaling positions by their recent
-volatility reduces drawdowns and improves risk‑adjusted performance【511009017126348†L146-L152】.
+sold.  Research shows that portfolio design choices
+(ranking horizon, weighting scheme) materially affect returns and risk, and that scaling positions by their recent
+volatility reduces drawdowns and improves risk‑adjusted performance.
 
 The workflow implemented here is:
 
@@ -19,16 +18,16 @@ The workflow implemented here is:
 2. **Compute engineered features** using the ``feature_engineering`` module.
    We request log returns, volatility estimates, drawdowns, trend indicators
    and cross‑sectional ranks of the 252‑day (12‑month) log return.  Cross‑
-   sectional ranks are essential for relative momentum strategies【416002924589760†L24-L33】.
+   sectional ranks are essential for relative momentum strategies.
 3. **Construct signals**: we take the cross‑sectional percentile rank of the
    252‑day return and assign a long (+1) position to assets in the top 20%
    and a short (‑1) position to assets in the bottom 20%.  Positions in
    the middle 60% are set to 0.  This long‑short framework reflects the
-   classical momentum factor【416002924589760†L81-L113】.
+   classical momentum factor.
 4. **Apply volatility scaling**: raw signals are divided by each asset’s
    63‑day (three month) rolling volatility.  Scaling by volatility helps
    mitigate crash risk and improves Sharpe ratios, as documented in
-   financial research【511009017126348†L146-L152】.  We then normalise the
+   financial research.  We then normalise the
    weights so that the sum of absolute weights equals 1 on each date.
 5. **Write outputs**: signals and scaled weights are stored in
    ``data/signals`` with a date stamp.  These CSV files can be consumed
@@ -90,7 +89,7 @@ def compute_cs_momentum_signals(
     assigned a long (+1) signal, those with ranks less than or equal to
     ``short_pct`` receive a short (‑1) signal, and all others get 0.  This
     mirrors the construction of classical cross‑sectional momentum factors
-    where the strongest performers are bought and the weakest are sold【416002924589760†L24-L33】.
+    where the strongest performers are bought and the weakest are sold.
 
     Parameters
     ----------
@@ -129,7 +128,7 @@ def compute_vol_scaled_weights(
     larger weights to less volatile assets and smaller weights to more
     volatile ones.  The idea is supported by research showing that
     volatility scaling reduces crash risk and improves risk‑adjusted
-    returns【511009017126348†L146-L152】.  After scaling, weights are
+    returns.  After scaling, weights are
     normalised so that the sum of absolute weights equals 1 on each date.
 
     Parameters

@@ -20,7 +20,7 @@ design follows best practices for systematic investment management:
   volatility is above a target (e.g. 10% annualised), gross exposure
   is scaled down.  These rules are inspired by research showing
   volatility scaling and drawdown filters can improve momentum
-  strategies【957229703235926†L61-L90】.
+  strategies.
 * **Rebalance** – load the latest weights (top percentile long, bottom
   percentile short, scaled by volatility) and translate them into
   dollar notional targets using the current account equity.  Compare
@@ -50,7 +50,7 @@ This script does not attempt to forecast market conditions.  The
 strategy is based purely on cross‑sectional momentum and volatility
 scaling; however, the modular structure allows you to plug in
 additional features such as learning‑to‑rank models or sentiment
-signals in the future【836591747530947†L13-L18】【435448437375163†L69-L76】.
+signals in the future.
 """
 
 from __future__ import annotations
@@ -71,6 +71,9 @@ from alpaca.trading.enums import OrderSide, TimeInForce
 
 import trade_algorithm
 import signal_generation
+import thematic_sleeve
+import trend_strategy
+from risk_management import RiskConfig, compute_exposure
 from universe_segments import run_segmented_strategy
 
 
@@ -163,7 +166,7 @@ def load_latest_target_weights(signals_dir: Path, use_segmented: bool = True) ->
         if seg_files:
             w_path = seg_files[-1]
         else:
-            print("[WARNING] No weights_segmented_*.csv found — falling back to weights_cs_*.csv")
+            print("[WARNING] No weights_segmented_*.csv found - falling back to weights_cs_*.csv")
             w_path = latest_csv(signals_dir, "weights_cs_*.csv")
     else:
         w_path = latest_csv(signals_dir, "weights_cs_*.csv")
@@ -421,7 +424,7 @@ def submit_orders(
                 })
             except Exception as exc:
                 if "insufficient qty" in str(exc).lower():
-                    print(f"[WARNING] {sym}: insufficient qty — skipping. ({exc})")
+                    print(f"[WARNING] {sym}: insufficient qty - skipping. ({exc})")
                     results.append({
                         "symbol": sym,
                         "notional": notional,
@@ -477,15 +480,85 @@ def estimate_realized_vol(series: pd.Series, window: int = 63) -> float:
     return float(daily_vol * np.sqrt(252))
 
 
+def build_trend_targets(
+    base_dir: Path,
+    dirs: Dict[str, Path],
+    thematic_allocation: float = 0.30,
+) -> pd.Series:
+    """Target weights of the second-generation strategy.
+
+    The account is split in two sleeves:
+
+    * a **core** sleeve (``1 - thematic_allocation`` of the account) that
+      follows ``trend_strategy.py`` on the ETF universe, and
+    * a **thematic** sleeve (``thematic_allocation``) that follows
+      ``thematic_sleeve.py`` on ``data/universe_thematic.csv``.
+
+    Capital that the thematic sleeve does not use (because volatility is
+    high or trends are negative) is parked in the cash ETF of the core
+    sleeve.  If the thematic prices cannot be downloaded the whole
+    account follows the core sleeve.
+
+    Parameters
+    ----------
+    base_dir : Path
+        Root directory of the project.
+    dirs : dict[str, Path]
+        Output of :func:`project_dirs`.
+    thematic_allocation : float, optional
+        Fraction of the account assigned to the thematic sleeve.
+
+    Returns
+    -------
+    pandas.Series
+        Target weights indexed by ticker.  They sum to at most 1 and are
+        *not* renormalised afterwards: the uninvested part is intended.
+    """
+    etf_prices = pd.read_csv(
+        latest_csv(dirs["prices"], "adjclose_wide_*.csv"), index_col=0, parse_dates=True
+    ).dropna(axis=1, how="all").sort_index()
+    core = trend_strategy.latest_target_weights(etf_prices)
+
+    sleeve = pd.Series(dtype=float)
+    if thematic_allocation > 0:
+        try:
+            theme_prices = thematic_sleeve.download_thematic_prices(base_dir).ffill()
+            sleeve = thematic_sleeve.latest_sleeve_weights(theme_prices)
+        except Exception as exc:  # network or data problem: fall back to core only
+            print(f"[WARNING] Thematic sleeve unavailable ({exc}). Using the core sleeve only.")
+            thematic_allocation = 0.0
+
+    target = core * (1.0 - thematic_allocation)
+    if thematic_allocation > 0 and not sleeve.empty:
+        target = target.add(sleeve * thematic_allocation, fill_value=0.0)
+        unused = thematic_allocation * (1.0 - float(sleeve.sum()))
+        cash = trend_strategy.CASH_TICKER
+        if cash in target.index and unused > 0:
+            target[cash] += unused
+    target.index = target.index.astype(str)
+    return target[target.abs() > 1e-6]
+
+
+def append_equity_row(equity_path: Path, row: dict) -> None:
+    """Append one observation to ``equity_history.csv``."""
+    eq_df = pd.DataFrame([row])
+    if equity_path.exists():
+        eq_df.to_csv(equity_path, mode="a", header=False, index=False)
+    else:
+        eq_df.to_csv(equity_path, index=False)
+
+
 def main(
     dry_run: bool = True,
     gross_exposure: float = 1.0,
     long_only: bool = False,
     max_drawdown: float = -0.1,
     target_vol: float = 0.1,
-    rebalance_band: float = 0.01,
+    rebalance_band: float = 0.02,
     min_trade_usd: float = 25.0,
     use_segmented: bool = True,
+    strategy: str = "trend",
+    thematic_allocation: float = 0.30,
 ) -> None:
     """Entry point for the daily execution pipeline.
 
@@ -499,67 +572,84 @@ def main(
     gross_exposure : float, optional
         Base gross exposure multiplier applied to target weights.
     long_only : bool, optional
-        Disallow short positions by zeroing negative weights.
+        Disallow short positions by zeroing negative weights.  Only
+        relevant for the legacy strategies; the trend strategy is long
+        only by construction.
     max_drawdown : float, optional
-        Maximum permissible drawdown (negative number).  If the
-        portfolio’s equity declines from its peak by more than this
-        fraction, no trades will be executed.  Default is -0.10
-        (10% drawdown).
+        Drawdown from the 252-observation peak (negative number) at which
+        exposure is cut to its floor.  Exposure starts to fall at half
+        this drawdown and the account is moved to cash at twice this
+        drawdown.  Unlike the first version of this script, the rule
+        looks at the *current* drawdown, so exposure is restored as the
+        account recovers.  Default is -0.10.
     target_vol : float, optional
-        Annualised volatility target.  If the realised volatility of
-        the portfolio over the recent window exceeds this level,
-        gross exposure is scaled down proportionally.  Default is 0.10
-        (10% annual volatility).
+        Annualised volatility target of the account.  If realised
+        volatility over the last 63 observations exceeds this level,
+        exposure is scaled down proportionally.  Default is 0.10.
     rebalance_band : float, optional
         Fraction of equity representing a threshold below which
         differences between current and target positions are ignored.
-        Helps reduce turnover.  Default is 0.01 (1%).
+        Default is 0.02 (2%), the value used in the backtest of the
+        trend strategy.
     min_trade_usd : float, optional
         Minimum notional amount per trade.  Orders smaller than this
         threshold are skipped.
     use_segmented : bool, optional
-        If True (default), use weights from the segmented momentum
-        strategy (``weights_segmented_*.csv``) instead of the plain
-        cross-sectional strategy (``weights_cs_*.csv``).
+        Legacy switch, used only when ``strategy="legacy"``.  If True,
+        use ``weights_segmented_*.csv``; otherwise ``weights_cs_*.csv``.
+    strategy : str, optional
+        ``"trend"`` (default) trades the blended trend strategy plus the
+        thematic sleeve.  ``"legacy"`` reproduces the original
+        cross-sectional momentum behaviour.
+    thematic_allocation : float, optional
+        Fraction of the account assigned to the thematic sleeve when
+        ``strategy="trend"``.  Zero disables the sleeve.
     """
     base_dir = Path(__file__).resolve().parent
     dirs = project_dirs(base_dir)
     dirs["live"].mkdir(parents=True, exist_ok=True)
     dirs["logs"].mkdir(parents=True, exist_ok=True)
     run_flag = dirs["live"] / f"last_run_{datetime.now(timezone.utc).date().isoformat()}.flag"
-    if run_flag.exists():
+    if not dry_run and run_flag.exists():
         print("[SKIP] Already ran today. Exiting to avoid duplicate trading.")
         return
-    run_flag.write_text(datetime.now(timezone.utc).isoformat(), encoding="utf-8")
+    if not dry_run:
+        run_flag.write_text(datetime.now(timezone.utc).isoformat(), encoding="utf-8")
 
     # Step A: Update data
     trade_algorithm.main()
 
     # Step B: Generate signals and weights
-    signal_generation.main()
+    today_str = datetime.now(timezone.utc).date().isoformat()
+    if strategy == "legacy":
+        signal_generation.main()
 
-    # Step B2: Generate segmented weights and save to data/signals/
-    import glob as _glob
-    price_files = sorted(_glob.glob(str(dirs["prices"] / "adjclose_wide_*.csv")))
-    if price_files:
-        prices_df = pd.read_csv(price_files[-1], index_col=0, parse_dates=True).dropna(axis=1, how="all")
-        seg_result = run_segmented_strategy(prices_df)
-        seg_weights: pd.DataFrame = seg_result["weights"]
-        today_str = datetime.now(timezone.utc).date().isoformat()
+        # Step B2: Generate segmented weights and save to data/signals/
+        prices_df = pd.read_csv(
+            latest_csv(dirs["prices"], "adjclose_wide_*.csv"), index_col=0, parse_dates=True
+        ).dropna(axis=1, how="all")
+        seg_weights: pd.DataFrame = run_segmented_strategy(prices_df)["weights"]
         seg_path = dirs["signals"] / f"weights_segmented_{today_str}.csv"
         seg_weights.to_csv(seg_path)
         print(f"[B2] Segmented weights saved to {seg_path}")
-    else:
-        print("[B2] WARNING: No price files found — skipping segmented weight generation")
 
-    # Step C: Load latest weights
-    target_w = load_latest_target_weights(dirs["signals"], use_segmented=use_segmented)
-    target_w = enforce_weight_constraints(
-    target_w,
-    max_positions=10,
-    max_weight_per_asset=0.15,
-    long_only=long_only,
-)
+        # Step C: Load latest weights
+        target_w = load_latest_target_weights(dirs["signals"], use_segmented=use_segmented)
+        target_w = enforce_weight_constraints(
+            target_w,
+            max_positions=10,
+            max_weight_per_asset=0.15,
+            long_only=long_only,
+        )
+    elif strategy == "trend":
+        # Step B/C: Blended trend (core) plus thematic sleeve
+        target_w = build_trend_targets(base_dir, dirs, thematic_allocation=thematic_allocation)
+        dirs["signals"].mkdir(parents=True, exist_ok=True)
+        live_path = dirs["signals"] / f"weights_live_{today_str}.csv"
+        target_w.rename("weight").to_csv(live_path, index_label="Ticker")
+        print(f"[B] Live target weights saved to {live_path}")
+    else:
+        raise ValueError(f"Unknown strategy '{strategy}'. Use 'trend' or 'legacy'.")
 
     # Step D: Connect to broker and fetch account info
     trading = alpaca_client()
@@ -571,73 +661,65 @@ def main(
 
     # Step E: Risk controls based on past equity history
     equity_path = dirs["live"] / "equity_history.csv"
-    # Calculate drawdown and realised volatility if history exists
-    scaled_exposure = gross_exposure
-    halted = False
+    risk_cfg = RiskConfig(
+        target_vol=target_vol,
+        dd_soft=max_drawdown / 2.0,
+        dd_hard=max_drawdown,
+        dd_kill=max_drawdown * 2.0,
+    )
+    equity_series = pd.Series([equity], dtype=float)
     if equity_path.exists():
         hist = pd.read_csv(equity_path)
         if not hist.empty:
-            # Combine historical equity with today's equity to estimate returns
-            equity_series = pd.concat(
-                [
-                    hist["equity"],
-                    pd.Series({len(hist): equity}),
-                ],
-                ignore_index=True,
-            )
-            # Compute normalised returns from equity differences
-            daily_returns = equity_series.pct_change().dropna()
-            dd = compute_drawdown(equity_series)
-            realized_vol = estimate_realized_vol(daily_returns)
-            # Apply drawdown rule
-            if dd <= max_drawdown:
-                print(
-                    f"Drawdown {dd:.2%} exceeds threshold {max_drawdown:.2%}. Trading halted for safety."
-                )
-                halted = True
-            # Apply volatility targeting (scale down exposure when vol is high)
-            if not np.isnan(realized_vol) and realized_vol > target_vol and realized_vol > 0:
-                scale = target_vol / realized_vol
-                scaled_exposure = gross_exposure * scale
-                print(
-                    f"Realised vol {realized_vol:.2%} exceeds target {target_vol:.2%}. Scaling exposure by {scale:.2f}."
-                )
-    # Step F: If halted, log and exit
-    if halted:
+            equity_series = pd.concat([hist["equity"], equity_series], ignore_index=True)
+    risk = compute_exposure(equity_series, risk_cfg)
+    scaled_exposure = gross_exposure * risk["exposure"]
+
+    if risk["suspect_print"]:
+        # The broker reported an equity value that is implausibly far from
+        # the previous ones.  Do not trade on it; look again tomorrow.
+        print(f"Equity print {equity:,.2f} looks wrong. No orders today.")
         log_jsonl(
             dirs["logs"] / "daily_execution.jsonl",
             {
                 "timestamp_utc": timestamp,
                 "equity": equity,
-                "halt_reason": "max_drawdown_exceeded",
+                "halt_reason": "suspect_equity_print",
                 "gross_exposure": gross_exposure,
             },
         )
-        # Still record equity history but no orders
-        eq_df = pd.DataFrame([
-            {
-                "timestamp_utc": timestamp,
-                "equity": equity,
-                "gross_exposure": 0.0,
-                "dry_run": dry_run,
-                "n_orders": 0,
-            }
-        ])
-        if equity_path.exists():
-            eq_df.to_csv(equity_path, mode="a", header=False, index=False)
-        else:
-            eq_df.to_csv(equity_path, index=False)
-        print("Trading halted due to risk controls.")
+        append_equity_row(equity_path, {
+            "timestamp_utc": timestamp, "equity": equity,
+            "gross_exposure": 0.0, "dry_run": dry_run, "n_orders": 0,
+        })
         return
 
-    # Step G: Convert weights to dollar notionals (apply risk scaling)
-    target_notional = compute_target_notional(
-        equity=equity,
-        target_w=target_w,
-        gross_exposure=scaled_exposure,
-        long_only=long_only,
-    )
-    # Step H: Generate order plan
+    if risk["kill_switch"]:
+        print(
+            f"Drawdown reached {risk_cfg.dd_kill:.0%} within the last "
+            f"{risk_cfg.kill_cooldown} runs. Moving the account to cash."
+        )
+        target_w = target_w * 0.0
+    elif risk["exposure"] < 1.0:
+        print(
+            f"Risk overlay: drawdown {risk['drawdown']:.2%} -> x{risk['dd_multiplier']:.2f}, "
+            f"volatility -> x{risk['vol_multiplier']:.2f}. Exposure {scaled_exposure:.2f}."
+        )
+
+    # Step F: Compute target dollar positions
+    if strategy == "legacy":
+        target_notional = compute_target_notional(
+            equity=equity,
+            target_w=target_w,
+            gross_exposure=scaled_exposure,
+            long_only=long_only,
+        )
+    else:
+        # Trend weights already embed the volatility target and the cash
+        # position, so they must not be renormalised to sum to one.
+        target_notional = (target_w * (equity * scaled_exposure)).to_dict()
+
+    # Step G: Generate order plan and apply cash budget
     orders = generate_order_plan(
         equity=equity,
         current_mv=positions,
@@ -645,36 +727,31 @@ def main(
         rebalance_band=rebalance_band,
         min_notional_usd=min_trade_usd,
     )
-    # Keep a :contentReference[oaicite:9]{index=9} never goes to ~0
     orders = apply_cash_budget(orders, cash_available=cash, cash_buffer_usd=max(50.0, 0.01 * equity))
-    # Step I: Submit or preview orders
+
+    # Step H: Submit orders
     results = submit_orders(trading, orders, dry_run=dry_run)
-    # Count number of orders submitted or planned
     n_orders = len(results)
 
-    # Step J: Log equity and gross exposure used
-    eq_df = pd.DataFrame([
-        {
-            "timestamp_utc": timestamp,
-            "equity": equity,
-            "gross_exposure": scaled_exposure,
-            "dry_run": dry_run,
-            "n_orders": n_orders,
-        }
-    ])
-    if equity_path.exists():
-        eq_df.to_csv(equity_path, mode="a", header=False, index=False)
-    else:
-        eq_df.to_csv(equity_path, index=False)
+    # Step I: Record today's equity and exposure
+    append_equity_row(equity_path, {
+        "timestamp_utc": timestamp, "equity": equity,
+        "gross_exposure": scaled_exposure, "dry_run": dry_run, "n_orders": n_orders,
+    })
 
-    # Step K: Log detailed events
+    # Step J: Write audit log
     log_jsonl(
         dirs["logs"] / "daily_execution.jsonl",
         {
             "timestamp_utc": timestamp,
             "equity": equity,
             "dry_run": dry_run,
+            "strategy": strategy,
             "gross_exposure": scaled_exposure,
+            "drawdown": risk["drawdown"],
+            "dd_multiplier": risk["dd_multiplier"],
+            "vol_multiplier": risk["vol_multiplier"],
+            "kill_switch": risk["kill_switch"],
             "long_only": long_only,
             "orders": results,
         },
@@ -686,5 +763,6 @@ def main(
 
 
 if __name__ == "__main__":
-    # Default: dry run; adjust gross_exposure and risk limits as needed
-    main(dry_run=False, gross_exposure=0.98, long_only=True) 
+    # Paper trading with the blended trend strategy and the thematic sleeve.
+    # Use strategy="legacy" to reproduce the original behaviour.
+    main(dry_run=False, gross_exposure=0.98, long_only=True)

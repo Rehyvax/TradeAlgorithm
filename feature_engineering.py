@@ -8,8 +8,8 @@ is to extract information from historical prices that can be used to
 drive trading signals or risk models.  For example, time‑series and
 cross‑sectional momentum strategies rely on past returns, moving
 averages and volatility measures to gauge the strength and persistence
-of trends【573758359642248†L34-L43】, while risk management routines use
-drawdowns and volatility scaling to adjust position sizes【108184354453101†L89-L100】.
+of trends, while risk management routines use
+drawdowns and volatility scaling to adjust position sizes.
 
 The functions in this file operate on pandas DataFrames where the
 rows are dates (or datetimes) and the columns are asset identifiers
@@ -19,7 +19,7 @@ They are meant to be building blocks for more complex models and
 portfolio construction frameworks, as described in the TrendFolios®
 paper where trend‐following strategies analyse historical prices and
 returns across multiple timeframes to produce indicators based on
-moving averages, volatility measures and price ranges【573758359642248†L34-L43】.
+moving averages, volatility measures and price ranges.
 
 Functions
 ---------
@@ -52,19 +52,19 @@ References
 ----------
 * "TrendFolios®: A Portfolio Construction Framework for Utilizing
   Momentum and Trend‑Following In a Multi‑Asset Portfolio" (Lu et al.,
-  2025) — Discusses the importance of moving averages, volatility
-  measures and trading ranges in trend‑following strategies【573758359642248†L34-L43】.
+  2025) - Discusses the importance of moving averages, volatility
+  measures and trading ranges in trend‑following strategies.
 * "Feature Engineering for Financial Market Prediction: From Historical
-  Data to Actionable Insights" (Ailyn, 2024) — Explains that features
+  Data to Actionable Insights" (Ailyn, 2024) - Explains that features
   can include price trends, trading volumes and other time‑series
-  specific variables such as moving averages and volatility measures【949929375550076†L35-L50】.
-* "Financial Engineering and Time Series Analytics" (Jones, 2025) —
+  specific variables such as moving averages and volatility measures.
+* "Financial Engineering and Time Series Analytics" (Jones, 2025) -
   Notes that key feature engineering techniques for financial time
   series include lag features, differencing, volatility measures and
-  momentum indicators【260462117398459†L48-L52】.
+  momentum indicators.
 * "Enhancing Time Series Momentum Strategies Using Deep Neural
-  Networks" (Lim et al., 2019) — Highlights the role of volatility
-  scaling in improving the performance of momentum strategies【108184354453101†L89-L100】.
+  Networks" (Lim et al., 2019) - Highlights the role of volatility
+  scaling in improving the performance of momentum strategies.
 
 """
 
@@ -91,7 +91,7 @@ def compute_log_returns(
         Number of days over which to compute log returns.  Typical
         values include 1 (daily), 5 (weekly), 21 (monthly), 63 (3 months)
         and 252 (one year).  Larger horizons capture longer term
-        momentum effects【573758359642248†L34-L43】.
+        momentum effects.
 
     Returns
     -------
@@ -121,8 +121,7 @@ def compute_rolling_volatility(
     Volatility is measured as the rolling standard deviation of daily
     log returns.  Different windows capture different risk horizons.
     Empirical research shows that incorporating volatility measures
-    alongside momentum signals can improve risk‑adjusted performance
-    【108184354453101†L89-L100】.
+    alongside momentum signals can improve risk‑adjusted performance.
 
     Parameters
     ----------
@@ -155,7 +154,7 @@ def compute_rolling_drawdown(
     Drawdown is defined as the percentage decline from the rolling
     maximum price over a given window.  It measures how far the
     current price has fallen relative to its recent highs and is
-    commonly used for risk management and regime classification【573758359642248†L34-L43】.
+    commonly used for risk management and regime classification.
 
     Parameters
     ----------
@@ -189,7 +188,7 @@ def compute_trend_features(
     average to determine whether an asset is in an uptrend or downtrend.
     They also capture the slope of the moving average to measure the
     strength of the trend.  Such moving‑average rules are widely used
-    in momentum and trend‑following strategies【573758359642248†L34-L43】.
+    in momentum and trend‑following strategies.
 
     Parameters
     ----------
@@ -238,8 +237,7 @@ def compute_cross_sectional_rank(data: pd.DataFrame) -> pd.DataFrame:
     near 1.0 and those with the lowest returns are ranked near 0.0.
     Empirical studies show that constructing long‑short portfolios by
     buying assets with the highest‑ranked trend signals and selling
-    those with the lowest‑ranked signals can deliver positive returns
-    【416002924589760†L24-L33】.  Using percentile ranks rather than raw
+    those with the lowest‑ranked signals can deliver positive returns.  Using percentile ranks rather than raw
     returns also makes the feature scale‑free and robust to outliers.
 
     Parameters
@@ -297,7 +295,7 @@ def build_features(
     specifying ``(252,)`` will compute percentile ranks for the 252‑day
     (one year) log return across all assets on each date.  Cross‑
     sectional ranking is the basis of relative momentum strategies that
-    buy past winners and sell past losers【416002924589760†L24-L33】.  If
+    buy past winners and sell past losers.  If
     ``cs_rank_horizons`` is ``None``, no cross‑sectional ranks are
     computed.
 

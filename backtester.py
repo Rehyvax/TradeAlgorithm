@@ -10,7 +10,7 @@ Sharpe ratio and maximum drawdown.
 The methodology follows industry best practices: returns are computed
 using simple percentage changes, weights are lagged by one day to
 avoid look‑ahead bias, and performance metrics are annualised using
-252 trading days【511009017126348†L84-L96】.  Drawdowns are computed
+252 trading days.  Drawdowns are computed
 relative to the running maximum of the cumulative return series.  The
 resulting equity curve chart is saved to disk for visual inspection.
 
@@ -22,11 +22,11 @@ References
   emphasises the importance of rigorous backtesting.
 * Moreira, A., & Muir, T. (2017). Volatility‑managed portfolios.  The
   authors show that scaling portfolio exposures by volatility can
-  significantly reduce drawdowns and improve Sharpe ratios【511009017126348†L146-L152】.
+  significantly reduce drawdowns and improve Sharpe ratios.
 * Pyry Pohjantähti (2024). Revisiting (Revitalizing) Momentum.  The
   study notes that the profitability of cross‑sectional momentum has
   declined and highlights techniques such as volatility scaling and
-  market state conditioning to enhance performance【416002924589760†L81-L113】.
+  market state conditioning to enhance performance.
 
 Usage
 -----
@@ -99,6 +99,7 @@ def compute_portfolio_returns(
     weights: pd.DataFrame,
     cost_bps: float = 5.0,
     volume_wide: pd.DataFrame | None = None,
+    capital: float = 100_000.0,
 ) -> pd.Series:
     """Compute daily portfolio returns with lagged weights and transaction costs.
 
@@ -119,7 +120,7 @@ def compute_portfolio_returns(
         When provided, transaction costs are estimated using a square-root
         market-impact model instead of the flat ``cost_bps`` fallback::
 
-            participation_rate = |Δweight| / (price × daily_volume)
+            participation_rate = |Δweight| × capital / (price × daily_volume)
             market_impact_bps  = 10 × √participation_rate
             daily_cost         = Σ market_impact_bps / 10 000
 
@@ -144,7 +145,7 @@ def compute_portfolio_returns(
         delta_w = w.diff().abs()
         dollar_vol = p * v
         with np.errstate(divide="ignore", invalid="ignore"):
-            part_rate = delta_w / dollar_vol
+            part_rate = delta_w * capital / dollar_vol
         part_rate = part_rate.replace([np.inf, -np.inf], np.nan).fillna(0.0)
         impact_bps = 10.0 * np.sqrt(part_rate)
         cost = (impact_bps / 10_000.0).sum(axis=1)
