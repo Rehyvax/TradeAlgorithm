@@ -128,7 +128,7 @@ def run_strategy(
         scaling.
     bottom_pct : float
         Percentile threshold for the short side.  Assets with
-        momentum rank ≤ bottom_pct are assigned –1 before
+        momentum rank ≤ bottom_pct are assigned -1 before
         scaling.
     vol_window : int
         Rolling window (in trading days) used to estimate
@@ -160,7 +160,7 @@ def run_strategy(
     momentum = momentum.reindex(log_returns.index)
     # cross‑sectional rank (percentile) for each date
     rank = momentum.rank(axis=1, pct=True, method="average")
-    # Signals: +1 for top percentile, –1 for bottom percentile, 0 elsewhere
+    # Signals: +1 for top percentile, -1 for bottom percentile, 0 elsewhere
     signals = pd.DataFrame(0.0, index=rank.index, columns=rank.columns)
     signals[rank >= (1.0 - top_pct)] = 1.0
     signals[rank <= bottom_pct] = -1.0

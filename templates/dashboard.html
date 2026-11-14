@@ -500,7 +500,7 @@
     <section id="positions" class="section">
       <div class="section-header">
         <h2>Current Positions</h2>
-        <p id="weightsDate">Latest signal weights — volatility-scaled &amp; normalised</p>
+        <p id="weightsDate">Target weights of the trend strategy, before the risk overlay</p>
       </div>
       <div class="card">
         <div class="card-label">Portfolio Weights</div>
@@ -514,7 +514,7 @@
     <section id="robustness" class="section">
       <div class="section-header">
         <h2>Robustness Analysis</h2>
-        <p>Top 10 parameter configurations by Sharpe ratio</p>
+        <p>Sharpe ratio of the core strategy and its neighbouring configurations</p>
       </div>
       <div class="card">
         <div class="table-wrap">
@@ -522,15 +522,12 @@
             <thead>
               <tr>
                 <th>#</th>
-                <th>Lookback</th>
-                <th>Long %</th>
-                <th>Short %</th>
-                <th>Vol win.</th>
-                <th>Cum. Return</th>
+                <th>Configuration</th>
                 <th>Ann. Return</th>
                 <th>Ann. Vol</th>
                 <th>Sharpe</th>
                 <th>Max DD</th>
+                <th>Turnover</th>
               </tr>
             </thead>
             <tbody id="robustnessBody"></tbody>
@@ -558,16 +555,17 @@
       <div class="about-block">
 
         <div class="card">
-          <div class="card-label">¿Qué es el momentum cross-seccional?</div>
+          <div class="card-label">¿Qué es la tendencia combinada?</div>
           <div class="about-text">
-            <p>El <strong>momentum cross-seccional</strong> es una estrategia que clasifica un conjunto de activos entre sí en función de su rentabilidad pasada. La idea central es que los activos que han tenido un mejor comportamiento relativo en los últimos meses tienden a seguir superando a sus pares durante el periodo siguiente, y viceversa.</p>
-            <p>En este proyecto el universo es un grupo de 24 ETFs que cubren renta variable global, renta fija, materias primas y activos alternativos. Cada día la estrategia sigue estos pasos:</p>
+            <p>La <strong>tendencia</strong> (trend following) mira la rentabilidad pasada de cada activo por separado: si lleva meses subiendo, se mantiene; si lleva meses bajando, se sale a caja. No compara unos activos con otros, solo cada uno con su propio pasado. Combinar horizontes lento y rápido evita depender de una sola ventana.</p>
+            <p>El universo son 24 ETFs de renta variable, renta fija y alternativos, más una cesta de 19 acciones de semiconductores. Cada día la estrategia sigue estos pasos:</p>
             <ol>
-              <li>Calcula el retorno logarítmico de los últimos 252 días (≈ 1 año) para cada ETF.</li>
-              <li>Clasifica los ETFs por ese retorno de forma cruzada: quién lo ha hecho mejor, quién peor.</li>
-              <li>Toma posición <strong>larga</strong> (compra) en el 20% superior y posición <strong>corta</strong> (venta) en el 20% inferior.</li>
-              <li>Escala cada posición por la inversa de su volatilidad para que los activos más volátiles no dominen el riesgo de la cartera.</li>
-              <li>Normaliza los pesos resultantes para que la suma de valores absolutos sea 1.</li>
+              <li>Calcula la tendencia de cada ETF a 3, 6 y 12 meses y promedia las tres señales.</li>
+              <li>Reparte el riesgo entre tres bloques (renta variable, renta fija y alternativos) y, dentro de cada bloque, pesa cada ETF por la inversa de su volatilidad.</li>
+              <li>Escala la cartera para apuntar a una volatilidad del 10% anual, sin apalancamiento.</li>
+              <li>Lo que no se invierte va a SHY (bonos del Tesoro a muy corto plazo).</li>
+              <li>El 30% de la cuenta sigue una cesta de semiconductores con control de volatilidad y filtro de tendencia, y el 70% sigue la cartera de ETFs.</li>
+              <li>Un control de riesgo reduce la exposición cuando la cuenta cae desde su máximo y la recupera cuando se repone.</li>
             </ol>
           </div>
         </div>
@@ -586,14 +584,14 @@
               <span class="about-icon">⚖️</span>
               <div>
                 <strong>Positions</strong>
-                <p>Muestra los pesos de la cartera en la última fecha de señal disponible. Las barras verdes son posiciones largas (el algoritmo espera que ese activo suba) y las rojas son cortas (espera que baje). El tamaño de cada barra refleja el peso ajustado por volatilidad.</p>
+                <p>Muestra los pesos objetivo de la última ejecución, antes del control de riesgo. Todas las posiciones son largas: cada barra es la fracción de la cuenta que la estrategia quiere en ese activo, y SHY recoge lo que queda sin invertir.</p>
               </div>
             </div>
             <div class="about-section-item">
               <span class="about-icon">🔬</span>
               <div>
                 <strong>Robustness</strong>
-                <p>Tabla del análisis de robustez: el algoritmo prueba múltiples combinaciones de parámetros (horizonte de lookback, percentiles long/short, ventana de volatilidad) y ordena los resultados por Sharpe ratio. Las celdas con fondo más verde corresponden a configuraciones con mejor relación rentabilidad/riesgo.</p>
+                <p>Tabla del análisis de robustez: la estrategia se evalúa con 20 configuraciones vecinas (ventanas de tendencia, volatilidad objetivo, frecuencia de rebalanceo, costes) y se ordenan por Sharpe ratio. Si el resultado cambia poco entre ellas, la estrategia no depende de un parámetro afortunado. Las celdas más verdes son las mejores.</p>
               </div>
             </div>
             <div class="about-section-item">
@@ -616,10 +614,13 @@
             <dd>Caída desde el máximo histórico. Si la cartera alcanzó $110.000 y ahora vale $100.000, el drawdown es del <em>−9,1%</em>. El <em>max drawdown</em> es la mayor caída registrada y refleja el peor escenario que habría vivido el inversor hasta ese momento.</dd>
 
             <dt>Volatility Scaling</dt>
-            <dd>Técnica que ajusta el tamaño de cada posición en función de la volatilidad reciente del activo. Los activos más volátiles reciben un peso menor para que cada uno contribuya de forma similar al riesgo total de la cartera. El resultado es una cartera más estable, con menos drawdowns y mejor Sharpe ratio.</dd>
+            <dd>Técnica que ajusta el tamaño de cada posición en función de la volatilidad reciente del activo. Los activos más volátiles reciben un peso menor para que cada uno contribuya de forma similar al riesgo total de la cartera. Reduce los drawdowns, aunque no garantiza un mejor Sharpe ratio.</dd>
 
-            <dt>Long / Short</dt>
-            <dd>Una posición <em>larga</em> (long) significa comprar un activo esperando que suba de precio. Una posición <em>corta</em> (short) significa venderlo sin tenerlo (a través de préstamo de valores) esperando recomprarlo más barato. Una cartera long/short puede generar rentabilidad independientemente de la dirección general del mercado.</dd>
+            <dt>Trend following</dt>
+            <dd>Estrategia que mantiene un activo mientras su precio sube de forma sostenida y sale a caja cuando deja de hacerlo. En este proyecto solo hay posiciones <em>largas</em> (compra) o caja, nunca cortas. Su valor principal es reducir las grandes caídas, no ganar más que mantener el activo.</dd>
+
+            <dt>Kill-switch</dt>
+            <dd>Regla de seguridad que lleva toda la cuenta a caja durante 21 ejecuciones si la caída desde el máximo alcanza el 20%. Después se rearma y vuelve a invertir de forma gradual.</dd>
           </dl>
         </div>
 
@@ -814,12 +815,12 @@
     if (data.error) {
       document.querySelector("#positions .card").innerHTML =
         '<div class="card-label">Portfolio Weights</div>' +
-        emptyState("No positions data available yet. Run signal_generation.py first.");
+        emptyState("No positions data available yet. Run daily_execution.py first.");
       return;
     }
 
     document.getElementById("weightsDate").textContent =
-      `Signal date: ${data.date} — volatility-scaled & normalised`;
+      `Target weights of ${data.date}, before the risk overlay`;
 
     const items  = data.weights;
     const labels = items.map(d => d.ticker);
@@ -883,11 +884,11 @@
     const tbody = document.getElementById("robustnessBody");
 
     if (data.error) {
-      tbody.innerHTML = `<tr><td colspan="10">${emptyState(data.error)}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7">${emptyState(data.error)}</td></tr>`;
       return;
     }
 
-    const top10 = data.slice(0, 10);
+    const top10 = data;
     const sharpes = top10.map(r => r.sharpe_ratio).filter(v => v != null);
     const minS = Math.min(...sharpes);
     const maxS = Math.max(...sharpes);
@@ -899,11 +900,7 @@
 
       return `<tr>
         <td style="color:var(--text-muted)">${i + 1}</td>
-        <td>${r.ranking_horizon ?? "—"}</td>
-        <td>${r.top_pct != null ? (r.top_pct * 100).toFixed(0) + "%" : "—"}</td>
-        <td>${r.bottom_pct != null ? (r.bottom_pct * 100).toFixed(0) + "%" : "—"}</td>
-        <td>${r.vol_window ?? "—"}</td>
-        <td>${fmtPct(r.cumulative_return)}</td>
+        <td>${r.configuration ?? "-"}</td>
         <td>${fmtPct(r.annualised_return)}</td>
         <td>${fmtPct(r.annualised_volatility)}</td>
         <td class="sharpe-cell"
@@ -911,6 +908,7 @@
           ${fmt(r.sharpe_ratio, 3)}
         </td>
         <td style="color:var(--red)">${fmtPct(r.max_drawdown)}</td>
+        <td>${r.annual_turnover != null ? fmt(r.annual_turnover, 1) + "x" : "-"}</td>
       </tr>`;
     }).join("");
   }

@@ -345,15 +345,15 @@ A Flask web dashboard is available at `http://localhost:5050` after running `das
 │ Equity Curve│  [Normalised equity curve, Chart.js]     │
 │ Positions   │  Total Return   Peak Equity   Drawdown   │
 │ Robustness  ├────────────────────────────────────────  │
-│ Logs        │  [Positions bar chart, green/red]        │
+│ Logs        │  [Target weights bar chart]        │
 │ About       ├────────────────────────────────────────  │
 │             │  [Robustness table, Sharpe heat-map]     │
 └─────────────┴──────────────────────────────────────────┘
 ```
 
-Sections: **Equity Curve** (normalised equity + total return / peak / drawdown metrics), **Positions** (current weights), **Robustness** (top-10 parameter configs by Sharpe), **Logs** (last 30 execution events with order tags), **About** (strategy explanation and glossary in Spanish).
+Sections: **Equity Curve** (normalised equity + total return / peak / drawdown metrics), **Positions** (target weights of the last execution, from `weights_live_*.csv`), **Robustness** (the 20 neighbouring configurations of the core sleeve, from `trend_robustness_*.csv`), **Logs** (last 30 execution events with order tags), **About** (strategy explanation and glossary in Spanish).
 
-![Robustness table](screenshots/robustness.png)
+Both tables read the files written by `trend_strategy.py` and `daily_execution.py`, so run those first. The legacy files (`weights_cs_*.csv`, `robust_results_*.csv`) are no longer shown.
 
 ---
 

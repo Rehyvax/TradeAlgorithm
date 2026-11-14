@@ -197,7 +197,7 @@ def compute_trend_features(
         columns.
     ma_window : int, optional
         Window length (in days) for the simple moving average.  A
-        common choice is 200 days (roughly 9–10 months).
+        common choice is 200 days (roughly 9 to 10 months).
 
     Returns
     -------

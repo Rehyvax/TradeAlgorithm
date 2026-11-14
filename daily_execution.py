@@ -6,14 +6,14 @@ performs data ingestion, feature extraction, signal generation and
 portfolio rebalancing against a paper trading broker (Alpaca).  The
 design follows best practices for systematic investment management:
 
-* **Data update** – call ``trade_algorithm.main`` to download the
+* **Data update**: call ``trade_algorithm.main`` to download the
   latest prices and save them under ``data/prices``.  Running this
   step daily ensures our features are computed from up‑to‑date data.
-* **Signal generation** – call ``signal_generation.main`` to compute
+* **Signal generation**: call ``signal_generation.main`` to compute
   cross‑sectional momentum ranks, raw long/short signals and
   volatility‑scaled weights.  Signals and weights are written into
   ``data/signals`` with a date stamp.
-* **Risk management** – compute the most recent equity history from
+* **Risk management**: compute the most recent equity history from
   prior runs and evaluate simple risk controls: a maximum drawdown
   limit and a target volatility rule.  If the strategy has suffered a
   large drawdown, trading is suspended for the day.  If the portfolio
@@ -21,13 +21,13 @@ design follows best practices for systematic investment management:
   is scaled down.  These rules are inspired by research showing
   volatility scaling and drawdown filters can improve momentum
   strategies.
-* **Rebalance** – load the latest weights (top percentile long, bottom
+* **Rebalance**: load the latest weights (top percentile long, bottom
   percentile short, scaled by volatility) and translate them into
   dollar notional targets using the current account equity.  Compare
   to current market value positions and generate market orders for the
   difference.  Orders are submitted through Alpaca’s paper trading
   API if ``dry_run=False``.
-* **Logging** – record a row in ``data/live/equity_history.csv`` with
+* **Logging**: record a row in ``data/live/equity_history.csv`` with
   the timestamp, equity and gross exposure used.  Write a full JSON
   log of the day’s actions to ``data/live/logs/daily_execution.jsonl``.
 

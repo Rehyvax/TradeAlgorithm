@@ -13,7 +13,7 @@ this module divides the price history into rolling windows:
     used to evaluate the strategy out-of-sample with the winning params.
   - The window then advances by ``n_test_years`` and the process repeats.
 
-With 20+ years of data (2005 – present), a 5-year train / 1-year test
+With 20+ years of data (2005 to present), a 5-year train / 1-year test
 split yields ~15-16 non-overlapping test periods.
 
 The reduced parameter grid (3 × 2 × 2 = 12 combinations) keeps each
@@ -96,7 +96,7 @@ def run_walk_forward(
         raise ValueError(
             f"Not enough history for {n_train_years}-year train + "
             f"{n_test_years}-year test windows. "
-            f"Data spans {first_date.date()} – {last_date.date()}."
+            f"Data spans {first_date.date()} to {last_date.date()}."
         )
 
     print(
@@ -204,7 +204,7 @@ def main() -> None:
     prices = prices.dropna(axis=1, how="all")
 
     print(f"Loaded: {len(prices)} rows × {len(prices.columns)} tickers")
-    print(f"Range : {prices.index[0].date()} – {prices.index[-1].date()}")
+    print(f"Range : {prices.index[0].date()} to {prices.index[-1].date()}")
     print()
 
     results_df, oos_returns = run_walk_forward(prices)

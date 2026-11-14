@@ -66,31 +66,31 @@ def equity():
 
 @app.route("/api/weights")
 def weights():
+    """Target weights of the trend strategy, as saved by daily_execution.py."""
     try:
-        path = _latest(os.path.join(BASE, "data", "signals", "weights_cs_*.csv"))
-        df = pd.read_csv(path, index_col=0)
-        last_date = str(df.index[-1])
-        last_row = df.iloc[-1]
+        path = _latest(os.path.join(BASE, "data", "signals", "weights_live_*.csv"))
+        df = pd.read_csv(path)
+        date = os.path.basename(path).replace("weights_live_", "").replace(".csv", "")
         weights_list = [
-            {"ticker": ticker, "weight": round(float(w), 6)}
-            for ticker, w in last_row.items()
-            if pd.notna(w) and w != 0.0
+            {"ticker": str(row["Ticker"]), "weight": round(float(row["weight"]), 6)}
+            for _, row in df.iterrows()
+            if pd.notna(row["weight"]) and float(row["weight"]) != 0.0
         ]
         weights_list.sort(key=lambda x: x["weight"], reverse=True)
-        return jsonify({"date": last_date, "weights": weights_list})
+        return jsonify({"date": date, "weights": weights_list})
     except FileNotFoundError:
         return jsonify({"error": "no data yet"})
 
 
 @app.route("/api/robustness")
 def robustness():
+    """Neighbouring configurations of the core strategy, from trend_strategy.py."""
     try:
-        path = _latest(os.path.join(BASE, "data", "signals", "robust_results_*.csv"))
+        path = _latest(os.path.join(BASE, "data", "signals", "trend_robustness_*.csv"))
         df = pd.read_csv(path)
         df = df.sort_values("sharpe_ratio", ascending=False)
-        # Round floats for cleaner JSON
-        float_cols = ["cumulative_return", "annualised_return",
-                      "annualised_volatility", "sharpe_ratio", "max_drawdown"]
+        float_cols = ["annualised_return", "annualised_volatility", "sharpe_ratio",
+                      "max_drawdown", "annual_turnover"]
         for col in float_cols:
             if col in df.columns:
                 df[col] = df[col].round(4)
