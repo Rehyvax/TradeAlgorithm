@@ -27,7 +27,7 @@ This module implements:
 
 Usage::
 
-    python universe_segments.py
+    python -m legacy.universe_segments
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ from itertools import product as iproduct
 import numpy as np
 import pandas as pd
 
-from robust_evaluation import compute_metrics, run_strategy
+from legacy.robust_evaluation import compute_metrics, run_strategy
 
 # ---------------------------------------------------------------------------
 # Universe segmentation

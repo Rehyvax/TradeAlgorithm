@@ -236,7 +236,7 @@ def main() -> None:
     metrics, generating the equity curve plot and writing outputs to
     disk.
     """
-    base_dir = Path(__file__).resolve().parent
+    base_dir = Path(__file__).resolve().parent.parent
     # Load latest price and weight files
     prices, weights = load_latest_files(base_dir)
     # Load volume data for market-impact costs if available

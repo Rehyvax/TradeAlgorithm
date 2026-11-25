@@ -121,14 +121,14 @@ def quality_checks_prices(prices: pd.DataFrame) -> pd.DataFrame:
     inspection before using the data in backtests or live models. The
     following flags are added as boolean columns to the returned DataFrame:
 
-    * ``flag_missing_adjclose`` – ``True`` when ``AdjClose`` is missing
+    * ``flag_missing_adjclose``: ``True`` when ``AdjClose`` is missing
       (``NA``) or non‑positive. Adjusted close should always be present and
       strictly positive; zeros or negative values often indicate corrupted
       data.
-    * ``flag_bad_volume`` – ``True`` when ``Volume`` is missing or
+    * ``flag_bad_volume``: ``True`` when ``Volume`` is missing or
       negative. Negative volumes are nonsensical and missing values may
       require imputation or exclusion.
-    * ``flag_duplicate`` – ``True`` when duplicate ``(Date, Ticker)`` rows
+    * ``flag_duplicate``: ``True`` when duplicate ``(Date, Ticker)`` rows
       are detected. Duplicate rows could result from overlapping downloads
       or accidental concatenations.
 

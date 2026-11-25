@@ -26,7 +26,7 @@ returns, giving a time series that can be evaluated with standard metrics.
 
 Usage::
 
-    python ml_strategy.py
+    python -m legacy.ml_strategy
 
 Prerequisites: pandas, numpy, scikit-learn.
 """
@@ -44,7 +44,7 @@ from sklearn.exceptions import ConvergenceWarning
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 
-from feature_engineering import build_features
+from legacy.feature_engineering import build_features
 
 warnings.filterwarnings("ignore", category=ConvergenceWarning)
 
@@ -135,11 +135,11 @@ def train_ml_strategy(prices: pd.DataFrame) -> dict:
     Returns
     -------
     dict with keys:
-        ``model``   – fitted LogisticRegression,
-        ``scaler``  – fitted StandardScaler,
-        ``metrics`` – performance metric dictionary,
-        ``returns`` – daily portfolio return Series (test period),
-        ``weights`` – wide weight DataFrame (test dates × tickers).
+        ``model``:   fitted LogisticRegression,
+        ``scaler``:  fitted StandardScaler,
+        ``metrics``: performance metric dictionary,
+        ``returns``: daily portfolio return Series (test period),
+        ``weights``: wide weight DataFrame (test dates × tickers).
     """
     df = prepare_ml_dataset(prices)
 

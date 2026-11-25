@@ -10,7 +10,7 @@ Why the original strategy was replaced
 The first strategy in this repository ranks all ETFs against each other,
 buys the top quantile and shorts the bottom quantile.  Walk-forward
 validation gave it an out-of-sample Sharpe ratio of -0.11, and applying
-the ranking inside each asset class (``universe_segments.py``) lifted it
+the ranking inside each asset class (``legacy/universe_segments.py``) lifted it
 to +0.31.  Three design choices explain most of the shortfall:
 
 1. **The short leg.**  With 18 to 24 broad ETFs the "losers" are whole
@@ -36,7 +36,7 @@ What this module does instead
   turnover by half without improving the result.
 * **Relative strength inside each sleeve.**  Within an asset class the
   assets with the strongest volatility-adjusted trend receive a larger
-  share.  This keeps the finding of ``universe_segments.py``, that
+  share.  This keeps the finding of ``legacy/universe_segments.py``, that
   ranking only makes sense among comparable assets, as a tilt rather
   than as an all-or-nothing rule.
 * **Risk budgeting.**  Assets are weighted by inverse volatility inside

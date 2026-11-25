@@ -1,7 +1,7 @@
 """Shared performance and statistical-significance metrics.
 
-The original modules (``backtester.py``, ``robust_evaluation.py`` and
-``ml_strategy.py``) each carry their own copy of a metrics function.  Those
+The original modules (``legacy/backtester.py``, ``legacy/robust_evaluation.py`` and
+``legacy/ml_strategy.py``) each carry their own copy of a metrics function.  Those
 copies divide the geometric annualised return by volatility and assume a
 zero risk-free rate, which overstates the Sharpe ratio whenever cash yields
 are material (2023 onwards).  This module is the single reference

@@ -11,14 +11,14 @@ ensure clarity and professionalism.
 
 The pipeline is composed of three major steps:
 
-1. **Load the universe** – read a CSV file (``data/universe.csv``) that
+1. **Load the universe**: read a CSV file (``data/universe.csv``) that
    specifies which tickers to fetch. The file must contain at least a
    ``Ticker`` column.
-2. **Download metadata** – for each ticker, query Yahoo Finance to obtain
+2. **Download metadata**: for each ticker, query Yahoo Finance to obtain
    the current total assets under management (``totalAssets``) and the
    average daily trading volume (``averageVolume``). The resulting metadata
    DataFrame is written to ``data/metadata/etf_metadata_YYYY‑MM‑DD.csv``.
-3. **Download price history** – fetch adjusted OHLCV data for each ticker
+3. **Download price history**: fetch adjusted OHLCV data for each ticker
    individually via yfinance. The data is checked for missing or anomalous
    values before being saved in both long and wide formats under
    ``data/prices/``.
@@ -143,7 +143,7 @@ def main() -> None:
         .tolist()
     )
     if not tickers:
-        raise ValueError("Universe is empty – no tickers found to download.")
+        raise ValueError("Universe is empty: no tickers found to download.")
     metadata_dir = base_dir / "data" / "metadata"
     metadata_dir.mkdir(parents=True, exist_ok=True)
     

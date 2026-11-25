@@ -52,7 +52,7 @@ from typing import Tuple
 import numpy as np
 import pandas as pd
 
-from feature_engineering import build_features
+from legacy.feature_engineering import build_features
 
 
 def load_latest_price_panel(prices_dir: Path) -> pd.DataFrame:
@@ -168,7 +168,7 @@ def main() -> None:
     the resulting signals and weights to disk with date stamps.
     """
     # Determine the base directory as the directory containing this script
-    base_dir = Path(__file__).resolve().parent
+    base_dir = Path(__file__).resolve().parent.parent
     # Locate the prices directory.  In some project layouts the data directory
     # resides next to this module (base_dir/data), while in others it is one
     # level higher (base_dir.parent/data).  Try the local path first and

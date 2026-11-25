@@ -1,7 +1,9 @@
 # TradeAlgorithm
 
 ![Paper Trading](https://img.shields.io/badge/mode-paper%20trading-blue)
-![Python](https://img.shields.io/badge/python-3.8%2B-informational)
+![Python](https://img.shields.io/badge/python-3.11%2B-informational)
+![Tests](https://github.com/Rehyvax/TradeAlgorithm/actions/workflows/tests.yml/badge.svg)
+![Status](https://img.shields.io/badge/status-research%20complete-lightgrey)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 **An end-to-end systematic trading research pipeline**: from raw market data to signal generation, walk-forward validation, risk management and automated paper-trading execution via Alpaca.
@@ -17,6 +19,8 @@ The second generation, described below, keeps the same pipeline and replaces the
 1. a **core sleeve** that follows a blended time-series trend on the ETF universe, with risk budgeting and volatility targeting (`trend_strategy.py`);
 2. a **thematic sleeve** that holds a volatile equity theme, by default AI and semiconductor stocks, under volatility and trend controls (`thematic_sleeve.py`);
 3. a **risk overlay** on the whole account that reduces exposure gradually in drawdowns and restores it on recovery (`risk_management.py`).
+
+**Status: research complete.** The conclusions are summarised in [Conclusions](#conclusions); the paper account keeps running as the only true out-of-sample test.
 
 The project is designed as a rigorous research prototype rather than a production system. Results are reported net of costs, against passive benchmarks, with a robustness table over neighbouring parameters and a Deflated Sharpe Ratio. Negative findings are documented with the same detail as positive ones, including a study that rejects short-window momentum in semiconductor stocks (`short_horizon_study.py`).
 
@@ -90,13 +94,13 @@ Yahoo Finance (ETF universe + thematic stocks, daily, from 2003/2005)
         ├──────────────────────────────┬──────────────────────────────┐
         ▼                              ▼                              ▼
 ┌────────────────────┐      ┌─────────────────────┐      ┌───────────────────────┐
-│ trend_strategy.py  │      │ thematic_sleeve.py  │      │ Legacy research       │
+│ trend_strategy.py  │      │ thematic_sleeve.py  │      │ legacy/ research      │
 │                    │      │                     │      │                       │
-│ Blended trend,     │      │ Volatility scaling  │      │ signal_generation.py  │
-│ risk budget,       │      │ and trend gate on   │      │ universe_segments.py  │
-│ vol target,        │      │ a stock theme       │      │ walk_forward.py       │
-│ staggered rebal.   │      │                     │      │ robust_evaluation.py  │
-└────────────────────┘      └─────────────────────┘      │ ml_strategy.py        │
+│ Blended trend,     │      │ Volatility scaling  │      │ signal_generation     │
+│ risk budget,       │      │ and trend gate on   │      │ universe_segments     │
+│ vol target,        │      │ a stock theme       │      │ walk_forward          │
+│ staggered rebal.   │      │                     │      │ robust_evaluation     │
+└────────────────────┘      └─────────────────────┘      │ ml_strategy           │
         │                              │                 └───────────────────────┘
         └──────────────┬───────────────┘
                        ▼
@@ -250,6 +254,26 @@ Two caveats. The 19 tickers are today's survivors, so the return of the basket i
 | One-month lookback in the trend blend | Turnover up by half, Sharpe from 0.53 to 0.48 |
 | Trend state as a return forecast (bull, correction, bear, rebound) | Sharpe ratios by state between 0.6 and 0.7 for SMH; what differs across states is volatility (25 % to 40 %), not return per unit of risk |
 
+### 6. Comparison with a published model: Ranked Asset Allocation Model
+
+Giordano's Ranked Asset Allocation Model (2018 Charles H. Dow Award, Journal of Technical Analysis 2020) ranks eleven ETFs of the 7Twelve portfolio every month on four factors: four-month momentum, an EWMA volatility model, average correlation with the other assets and an ATR breakout state. It holds the five best at 20 % each and moves any of them with negative momentum to cash. The paper reports a Sharpe ratio of 1.94 and a total return of 639 % from July 2004 to November 2017.
+
+`raam_replication.py` rebuilds the model with the printed rules. Eight of the twelve ETFs are not in this repository's data, so the test uses the closest asset of the same class (IWF, IWD, IWN, IWO, EFA, EEM, USO, GLD, LQD, TIP and BWX). The factor weights are not disclosed; we use momentum 1, volatility 0.5 and correlation 0.5.
+
+| Portfolio (net of 5 bps unless stated) | 2006 to 2017 | 2018 to 2026 | Full period | Max drawdown |
+|---|---|---|---|---|
+| Ranked model, gross | 0.60 | 0.54 | 0.58 | -21 % |
+| Ranked model, net | 0.56 | 0.50 | 0.54 | -22 % |
+| Trend strategy | 0.62 | 0.28 | 0.50 | -17 % |
+| 70 % trend, 30 % ranked model | 0.64 | 0.40 | 0.55 | -17 % |
+| Equal weight of the 11 proxies | 0.31 | 0.51 | 0.38 | -41 % |
+
+Figures are Sharpe ratios over the SHY return. Three findings:
+
+1. **The published Sharpe of 1.94 is not reproduced.** Measured the way the paper appears to measure it (monthly returns, no risk-free rate, no costs) our replication reaches 0.98 over 2006 to 2017. The rest of the gap has candidate explanations we cannot separate: different ETFs, history extended with interpolated proxy series, undisclosed factor weights, and no out-of-sample test or cost assumption in the paper.
+2. **The rules kept working after publication.** From 2018 to 2026, data the author could not have seen, the model earned a net Sharpe of 0.50, against 0.28 for the trend strategy. Removing the trend, correlation or volatility factor one at a time changes the full-period Sharpe by at most 0.01: almost all of the result comes from momentum ranking with the absolute momentum filter.
+3. **It diversifies the trend strategy a little.** Monthly correlation with the trend strategy is 0.68. A 30 % allocation inside the core sleeve raises the full-period Sharpe from 0.50 to 0.55 and the 2018 to 2026 Sharpe from 0.28 to 0.40, with the same maximum drawdown. The improvement is small and the 30 % was chosen after seeing these results, so it is disabled by default: `main(ranked_allocation=0.3)` in `daily_execution.py` enables it.
+
 ---
 
 ## Architecture
@@ -258,22 +282,20 @@ Two caveats. The 19 tickers are today's survivors, so the return of the basket i
 |---|---|
 | `trade_algorithm.py` | Downloads OHLCV data from Yahoo Finance; applies liquidity filters (min $500k daily volume, $200M AUM); saves `adjclose_wide`, `prices_long`, and `volume_wide` CSVs |
 | `loaders/price_loader.py` | `PriceDownloadConfig` dataclass; `download_prices_adjclose`, `quality_checks_prices`, `save_prices_panel` |
-| `feature_engineering.py` | Log returns (5 horizons), rolling volatility (3 windows), rolling drawdown, 200-day MA trend flag, cross-sectional percentile ranks |
 | `trend_strategy.py` | **Core strategy.** Blended trend score, within-sleeve relative strength, risk budgeting, volatility targeting, staggered rebalance, no-trade band; robustness grid and Deflated Sharpe Ratio |
 | `thematic_sleeve.py` | **Thematic sleeve.** Volatility scaling and trend gate on the stocks of `data/universe_thematic.csv`; comparison against the buy-and-hold basket |
 | `risk_management.py` | Equity sanitisation, current-drawdown scaling, volatility scaling, self re-arming kill-switch |
 | `performance_metrics.py` | Excess-return Sharpe, Sortino, Calmar, Probabilistic and Deflated Sharpe Ratio, block-bootstrap confidence interval |
 | `short_horizon_study.py` | Tests short-window momentum and reversal with next-open execution |
+| `raam_replication.py` | Replication of Giordano's Ranked Asset Allocation Model on a proxy universe; optional share of the core sleeve |
 | `daily_execution.py` | Orchestrates the daily pipeline; `strategy="trend"` (default) or `"legacy"`; risk overlay; submits market orders via Alpaca SDK |
-| `signal_generation.py` | Legacy: cross-sectional momentum signals and volatility-scaled weights |
-| `universe_segments.py` | Legacy: cross-sectional momentum inside asset-class segments |
-| `backtester.py` | Legacy backtest with lagged weights; square-root market-impact cost model (`10 × √participation_rate` bps) with 5 bps flat fallback |
-| `robust_evaluation.py` | Legacy grid search over (ranking_horizon, top_pct, vol_window) |
-| `walk_forward.py` | Rolling 5-year train / 1-year test windows for the legacy strategy |
-| `ml_strategy.py` | Logistic regression on per-(date, ticker) feature rows |
 | `dashboard_server.py` | Flask API server (port 5050); endpoints for equity, weights, robustness, logs |
 | `templates/dashboard.html` | Single-page UI; Chart.js equity curve and positions chart; robustness table; execution log cards |
 | `setup_scheduler.ps1` | Configures Windows Task Scheduler to run `run_daily.bat` at 16:30 local time |
+| `tests/` | 33 pytest tests on synthetic data: trend weights, look-ahead, costs, risk overlay, metrics, cash budget and the ranked model |
+| `legacy/` | The original cross-sectional research: `signal_generation`, `feature_engineering`, `universe_segments`, `backtester`, `robust_evaluation`, `walk_forward`, `ml_strategy`. Run from the root with `python -m legacy.<module>` |
+
+Two GitHub workflows run the project: `tests.yml` runs the import check and the test suite on every push, and `daily_trading.yml` runs the paper account on weekdays.
 
 ---
 
@@ -290,6 +312,13 @@ Create a `.env` file in the project root with your Alpaca Paper Trading credenti
 ```
 ALPACA_API_KEY=your_key_here
 ALPACA_API_SECRET=your_secret_here
+```
+
+Run the tests, which need no network or credentials:
+
+```bash
+pip install pytest
+python -m pytest
 ```
 
 ---
@@ -309,26 +338,32 @@ python thematic_sleeve.py
 # 4. Short-window momentum and reversal study
 python short_horizon_study.py
 
-# 5. Rebuild the figures in screenshots/ from the outputs of steps 2 to 4
+# 5. Replication of the Ranked Asset Allocation Model and comparison
+python raam_replication.py
+
+# 6. Rebuild the figures in screenshots/ from the outputs of steps 2 to 4
 python make_figures.py
 
-# 6. Daily paper trading execution
+# 7. Daily paper trading execution
 python daily_execution.py
 
-# 7. Launch the monitoring dashboard
+# 8. Launch the monitoring dashboard
 python dashboard_server.py
 # open http://localhost:5050
 
+# 9. Tests
+python -m pytest
+
 # Legacy research (original cross-sectional strategy)
-python signal_generation.py
-python backtester.py
-python robust_evaluation.py
-python walk_forward.py
-python universe_segments.py
-python ml_strategy.py
+python -m legacy.signal_generation
+python -m legacy.backtester
+python -m legacy.robust_evaluation
+python -m legacy.walk_forward
+python -m legacy.universe_segments
+python -m legacy.ml_strategy
 ```
 
-To run the original strategy in execution, call `main(strategy="legacy")` in `daily_execution.py`. To change the theme, edit `data/universe_thematic.csv`. To disable the thematic sleeve, call `main(thematic_allocation=0.0)`.
+To run the original strategy in execution, call `main(strategy="legacy")` in `daily_execution.py`. To change the theme, edit `data/universe_thematic.csv`. To disable the thematic sleeve, call `main(thematic_allocation=0.0)`. To give 30 % of the core sleeve to the Ranked Asset Allocation Model, call `main(ranked_allocation=0.3)`.
 
 **Scheduled execution.** `.github/workflows/daily_trading.yml` runs `daily_execution.py` on weekdays at 21:30 UTC. On Windows, run `setup_scheduler.ps1` as Administrator to register a Task Scheduler job that fires `run_daily.bat` every day at 16:30 local time.
 
@@ -369,20 +404,17 @@ Both tables read the files written by `trend_strategy.py` and `daily_execution.p
 
 ---
 
-## Future Work
+## Conclusions
 
-| Priority | Extension |
-|---|---|
-| [done] | Walk-forward validation with parameter selection on train data only |
-| [done] | Universe segmentation: momentum applied inside equity, fixed income and alternatives |
-| [done] | Blended trend strategy with risk budgeting, volatility targeting and staggered rebalance |
-| [done] | Risk overlay with equity sanitisation and a drawdown rule that recovers |
-| [done] | Thematic sleeve and short-window momentum study |
-| Next | Dashboard panels for the two sleeves and the risk overlay state |
-| Next | Unit tests for `risk_management.py` and `trend_strategy.py`, run in the GitHub workflow |
-| Next | Managed-futures style universe (rates, currencies and commodities through ETFs) to raise the number of independent trends |
-| Next | Short-term reversal as a separate, daily-traded sleeve with limit orders, where the evidence is strongest |
-| Next | Point-in-time universe for the thematic sleeve to remove survivorship bias |
+The research part of the project is closed. What it established, in order of confidence:
+
+1. **Cross-sectional momentum across a mixed ETF universe does not work out of sample** (walk-forward Sharpe -0.11). Ranking inside each asset class rescues part of it (+0.31), because comparing a bond fund with an equity fund by past return is mostly comparing their volatility.
+2. **Time-series trend with risk budgeting is a modest, plausible edge, not a strong one.** Sharpe about 0.5 net of costs since 2010. Probabilistic Sharpe 0.95, Deflated Sharpe 0.86 across the 20 neighbouring configurations, Probability of Backtest Overfitting 38 %, and a bootstrap interval that touches zero. The configuration in use is not the best of the 20, and its main value is lower volatility and drawdown than the passive mix.
+3. **The edge has weakened.** The Sharpe ratio falls from 0.60 in the first half of the sample to 0.26 in the second, with a loss of 14 % in 2022, when bonds and equities fell together.
+4. **More factors did not add much.** A published four-factor model (Giordano 2018) reaches the same place: almost all of its result comes from momentum ranking with an absolute filter, and its reported Sharpe of 1.94 drops to 0.56 under the same costs and risk-free rate. It kept working after publication and diversifies the trend strategy slightly.
+5. **Short-window momentum in semiconductor stocks is not an edge** once trades are executed at the next open, and trend rules on volatile equities are risk management: they halve the volatility and the drawdown without raising return per unit of risk.
+
+Further tuning of the same signals on the same assets would mostly fit noise. A substantial improvement would need a different source of return (carry, value across asset classes, or trend on futures with leverage) and is a separate project. The paper account keeps running as the out-of-sample record of this version.
 
 ---
 
@@ -392,6 +424,7 @@ Both tables read the files written by `trend_strategy.py` and `daily_execution.p
 - Barroso, P., & Santa-Clara, P. (2015). *Momentum has its moments.* Journal of Financial Economics, 116(1), 111-120.
 - Daniel, K., & Moskowitz, T. (2016). *Momentum crashes.* Journal of Financial Economics, 122(2), 221-247.
 - Gao, C., Li, S. Z., Yuan, P., & Zhou, G. (2026). *The anatomy of industry momentum.* SSRN working paper 6371558.
+- Giordano, G. (2020). *Ranked asset allocation model.* Journal of Technical Analysis, 70, 106-125.
 - Goulding, C., Harvey, C., & Mazzoleni, M. (2023). *Momentum turning points.* Journal of Financial Economics, 149(3), 378-406.
 - Hoffstein, C., Faber, N., & Braun, S. (2020). *Rebalance timing luck: the (dumb) luck of smart beta.* SSRN working paper 3673910.
 - Jegadeesh, N., & Titman, S. (1993). *Returns to buying winners and selling losers.* Journal of Finance, 48(1), 65-91.

@@ -16,14 +16,18 @@ python trade_algorithm.py          # Download & validate prices from Yahoo Finan
 python trend_strategy.py           # Core strategy: backtest, benchmarks, robustness table
 python thematic_sleeve.py          # Thematic sleeve vs buy-and-hold basket (downloads stock prices)
 python short_horizon_study.py      # Short-window momentum / reversal study (downloads prices)
+python raam_replication.py         # Replication of Giordano's Ranked Asset Allocation Model vs the trend strategy
 python make_figures.py             # Rebuild the README figures in screenshots/
 
-# Legacy research (original cross-sectional strategy)
-python signal_generation.py        # Generate cross-sectional momentum signals & weights
-python backtester.py               # Evaluate historical performance
-python robust_evaluation.py        # Grid-search parameter combinations
-python walk_forward.py             # Walk-forward validation
-python universe_segments.py        # Segmented cross-sectional momentum
+# Tests (synthetic data, no network or credentials)
+python -m pytest
+
+# Legacy research (original cross-sectional strategy), run from the root
+python -m legacy.signal_generation # Generate cross-sectional momentum signals & weights
+python -m legacy.backtester        # Evaluate historical performance
+python -m legacy.robust_evaluation # Grid-search parameter combinations
+python -m legacy.walk_forward      # Walk-forward validation
+python -m legacy.universe_segments # Segmented cross-sectional momentum
 
 # Utilities
 python test_alpaca_connection.py   # Verify Alpaca API credentials
@@ -35,7 +39,7 @@ run_daily.bat                      # Runs daily_execution.py via .venv, logs to 
 
 **Configuration**: Alpaca credentials go in a `.env` file as `ALPACA_API_KEY` and `ALPACA_API_SECRET`.
 
-There is no test suite or linter configured.
+Tests live in `tests/` (pytest, configured in `pytest.ini`) and run on every push through `.github/workflows/tests.yml`. There is no linter configured.
 
 ## Architecture
 
@@ -45,8 +49,6 @@ The pipeline is **filesystem-coupled**: each module produces timestamped CSV fil
 Yahoo Finance
     ↓
 trade_algorithm.py      → data/prices/adjclose_wide_YYYY-MM-DD.csv
-    ↓
-feature_engineering.py  → (imported as a library, not run directly)
     ↓
 trend_strategy.py       → core sleeve weights (ETF universe)
 thematic_sleeve.py      → thematic sleeve weights (data/universe_thematic.csv)
@@ -63,9 +65,11 @@ daily_execution.py      → Alpaca paper API → data/live/equity_history.csv
 - **`thematic_sleeve.py`**: Volatility scaling and trend gate on the stocks listed in `data/universe_thematic.csv`. `run_thematic_sleeve` for backtests and `latest_sleeve_weights` for execution.
 - **`risk_management.py`**: Pure functions. `compute_exposure(equity_series, RiskConfig)` returns the exposure multiplier from equity sanitisation, current drawdown, realised volatility and the kill-switch.
 - **`performance_metrics.py`**: Reference metrics for the new modules (Sharpe over a risk-free series, Deflated Sharpe Ratio, bootstrap interval). The legacy modules keep their own metric functions.
+- **`raam_replication.py`**: Replication of the Ranked Asset Allocation Model (Giordano 2018) on a proxy universe. `latest_raam_weights` feeds the optional `ranked_allocation` share of the core sleeve in `daily_execution.py` (0 by default).
 - **`short_horizon_study.py`**: Research only. Tests k-day momentum and reversal rules with next-open execution.
-- **`daily_execution.py`**: The production entry point. `strategy="trend"` (default) combines the core sleeve (70%) and the thematic sleeve (30%) in `build_trend_targets`; `strategy="legacy"` reproduces the original segmented cross-sectional behaviour. Key parameters in `main()`: `dry_run`, `gross_exposure`, `max_drawdown`, `target_vol`, `rebalance_band`, `min_trade_usd`, `strategy`, `thematic_allocation`.
-- **`feature_engineering.py`, `signal_generation.py`, `universe_segments.py`, `walk_forward.py`, `robust_evaluation.py`, `backtester.py`, `ml_strategy.py`**: Legacy cross-sectional momentum research, kept for reference and comparison.
+- **`daily_execution.py`**: The production entry point. `strategy="trend"` (default) combines the core sleeve (70%) and the thematic sleeve (30%) in `build_trend_targets`; `strategy="legacy"` reproduces the original segmented cross-sectional behaviour. Key parameters in `main()`: `dry_run`, `gross_exposure`, `max_drawdown`, `target_vol`, `rebalance_band`, `min_trade_usd`, `strategy`, `thematic_allocation`, `ranked_allocation` (share of the core sleeve given to the ranked model, 0 by default).
+- **`legacy/`**: `feature_engineering`, `signal_generation`, `universe_segments`, `walk_forward`, `robust_evaluation`, `backtester`, `ml_strategy`. Original cross-sectional momentum research, kept for reference. Imports use the `legacy.` prefix; `daily_execution.py` still uses `legacy.signal_generation` and `legacy.universe_segments` for `strategy="legacy"`.
+- **`tests/`**: pytest suite on synthetic prices (trend weights, no look-ahead, costs, risk overlay, metrics, cash budget, ranked model).
 
 ### Risk controls (in risk_management.py, applied by daily_execution.py)
 

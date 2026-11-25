@@ -29,7 +29,7 @@ to mitigate crash risk.
 
 Usage::
 
-    python TradeAlgorithm/robust_evaluation.py
+    python -m legacy.robust_evaluation
 
 The script will search for price panels in
 `data/prices`, run the evaluation and write

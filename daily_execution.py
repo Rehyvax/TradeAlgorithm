@@ -69,12 +69,13 @@ from alpaca.trading.client import TradingClient
 from alpaca.trading.requests import MarketOrderRequest
 from alpaca.trading.enums import OrderSide, TimeInForce
 
+import raam_replication
 import trade_algorithm
-import signal_generation
+from legacy import signal_generation
 import thematic_sleeve
 import trend_strategy
 from risk_management import RiskConfig, compute_exposure
-from universe_segments import run_segmented_strategy
+from legacy.universe_segments import run_segmented_strategy
 
 
 def project_dirs(base_dir: Path) -> Dict[str, Path]:
@@ -146,7 +147,7 @@ def load_latest_target_weights(signals_dir: Path, use_segmented: bool = True) ->
     """Load the most recent weight vector from the signals directory.
 
     If ``use_segmented=True`` (default), looks for the latest
-    ``weights_segmented_*.csv`` produced by ``universe_segments.py``.
+    ``weights_segmented_*.csv`` produced by ``legacy/universe_segments.py``.
     Falls back to ``weights_cs_*.csv`` if no segmented file exists.
 
     Parameters
@@ -484,6 +485,7 @@ def build_trend_targets(
     base_dir: Path,
     dirs: Dict[str, Path],
     thematic_allocation: float = 0.30,
+    ranked_allocation: float = 0.0,
 ) -> pd.Series:
     """Target weights of the second-generation strategy.
 
@@ -507,6 +509,10 @@ def build_trend_targets(
         Output of :func:`project_dirs`.
     thematic_allocation : float, optional
         Fraction of the account assigned to the thematic sleeve.
+    ranked_allocation : float, optional
+        Fraction of the core sleeve that follows the Ranked Asset
+        Allocation Model (``raam_replication.py``) instead of the trend
+        strategy.  Zero by default; see the README for the evidence.
 
     Returns
     -------
@@ -518,6 +524,9 @@ def build_trend_targets(
         latest_csv(dirs["prices"], "adjclose_wide_*.csv"), index_col=0, parse_dates=True
     ).dropna(axis=1, how="all").sort_index()
     core = trend_strategy.latest_target_weights(etf_prices)
+    if ranked_allocation > 0:
+        ranked = raam_replication.latest_raam_weights(etf_prices)
+        core = core.mul(1.0 - ranked_allocation).add(ranked.mul(ranked_allocation), fill_value=0.0)
 
     sleeve = pd.Series(dtype=float)
     if thematic_allocation > 0:
@@ -559,6 +568,7 @@ def main(
     use_segmented: bool = True,
     strategy: str = "trend",
     thematic_allocation: float = 0.30,
+    ranked_allocation: float = 0.0,
 ) -> None:
     """Entry point for the daily execution pipeline.
 
@@ -604,6 +614,9 @@ def main(
     thematic_allocation : float, optional
         Fraction of the account assigned to the thematic sleeve when
         ``strategy="trend"``.  Zero disables the sleeve.
+    ranked_allocation : float, optional
+        Fraction of the core sleeve that follows the Ranked Asset
+        Allocation Model.  Zero keeps the trend strategy alone.
     """
     base_dir = Path(__file__).resolve().parent
     dirs = project_dirs(base_dir)
@@ -644,7 +657,9 @@ def main(
         )
     elif strategy == "trend":
         # Step B/C: Blended trend (core) plus thematic sleeve
-        target_w = build_trend_targets(base_dir, dirs, thematic_allocation=thematic_allocation)
+        target_w = build_trend_targets(
+            base_dir, dirs, thematic_allocation=thematic_allocation, ranked_allocation=ranked_allocation
+        )
         dirs["signals"].mkdir(parents=True, exist_ok=True)
         live_path = dirs["signals"] / f"weights_live_{today_str}.csv"
         target_w.rename("weight").to_csv(live_path, index_label="Ticker")

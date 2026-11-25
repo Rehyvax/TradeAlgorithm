@@ -21,7 +21,7 @@ window's grid search fast enough to run interactively.
 
 Usage::
 
-    python walk_forward.py
+    python -m legacy.walk_forward
 
 Outputs (written to ``data/signals/``):
   - ``walk_forward_results_YYYY-MM-DD.csv``  - one row per test window
@@ -38,7 +38,7 @@ from itertools import product as iproduct
 import numpy as np
 import pandas as pd
 
-from robust_evaluation import compute_metrics, run_strategy
+from legacy.robust_evaluation import compute_metrics, run_strategy
 
 # Reduced grid for walk-forward (12 combinations per window)
 RANKING_HORIZONS = [63, 126, 252]
